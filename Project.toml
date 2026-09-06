@@ -1,4 +1,4 @@
-name = "LMFDB"
+name = "LMFDBLite"
 uuid = "d66269b8-7907-4a75-8041-d35544a92097"
 version = "0.1.0"
 authors = ["Tommy Hofmann <thofma@gmail.com>"]
@@ -6,9 +6,14 @@ authors = ["Tommy Hofmann <thofma@gmail.com>"]
 [deps]
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
 FunSQL = "cf6cc811-59f4-4a10-b258-a8547a8f6407"
-Hecke = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
 LibPQ = "194296ae-ab2e-5f79-8cd4-7183a0a5a0d1"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+
+[weakdeps]
+Hecke = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
+
+[extensions]
+LMFDBLiteHeckeExt = "Hecke"
 
 [compat]
 DBInterface = "2.6.1"
@@ -16,3 +21,11 @@ FunSQL = "0.15.0"
 Hecke = "0.39.12"
 LibPQ = "1.18.0"
 Tables = "1.12.1"
+julia = "1.9"
+
+[extras]
+Hecke = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Hecke", "Test"]

@@ -1,43 +1,31 @@
-#(:det, :disc, :id, :level, :rank, :nplus, :is_even, :discriminant_form, :discriminant_group_invs, :conway_symbol, :label, :rep, :mass, :class_number, :adjacency_matrix, :adjacency_polynomials, :dual_conway_symbol)
+"""
+    genus(db, label)
 
-function _genera_from_records(db, records::Vector{<:NamedTuple})
-  res = ZZGenus[]
-  #reps = integer_lattices(db; genus_label = ==(label))
-  genus_labels = [r[:label] for r in records]
-  reps = integer_lattices(db; genus_label = in(genus_labels))
-  for record in records
-    label = record[:label]
-    repsG = filter(r -> get_attribute(r, :lmfdb_genus_label) == label, reps)
-    r = Int(record[:rank])
-    rep = integer_lattice(; gram = matrix(ZZ, r, r, record[:rep]))
-    G = Hecke.genus(rep)
-    if length(repsG) > 0
-      @assert length(repsG) == record[:class_number]
-      set_attribute!(G, :representatives => repsG)
-    end
-    push!(res, G)
-  end
-  return res
-end
+Retrieve a Hecke genus of integer lattices by its LMFDB label.
+Load Hecke to enable this method.
+"""
+function genus end
 
-function _genus_from_record(db, record::NamedTuple)
-  label = record[:label]
-  reps = integer_lattices(db; genus_label = ==(label))
-  G = Hecke.genus(reps[1])
-  set_attribute!(G, :representatives => reps)
-  return G
-end
+"""
+    genera(db; limit = Inf, kw...)
 
-function genus(db, label::String)
-  res = LMFDBLite.search(db, "lat_genera"; label = ==(label))
-  @assert length(res) <= 1
-  if length(res) == 0
-    error("label does not exist")
-  end
-  return _genus_from_record(db, res[1])
-end
+Search `lat_genera` with `LMFDBLite.new_search` and construct Hecke genera from
+their stored representative Gram matrices. Attach each genus's `:lmfdb_label`
+and cache lattice representatives when the database supplies the complete set.
+Load Hecke to enable this method.
 
-function genera(db; kw...)
-  res = LMFDBLite.search(db, "lat_genera"; kw...)
-  return _genera_from_records(db, res)
-end
+Parameters include `label`, `rank`, `signature`, `level`, `class_number`,
+`is_even`, `determinant`, `discriminant`, `disc_group_invs`,
+`discriminant_group_exponent`, `discriminant_form`, `representative_gram_matrix`,
+`mass`, `conway_symbol`, `dual_conway_symbol`, and `scale`.
+
+Signatures are `(nplus, nminus)`. Integer parameters support comparisons and
+vector/range membership; labels support equality and vector membership.
+Boolean and vector parameters support equality. `mass` supports exact rational
+equality, e.g. `mass = 1//2`. Gram matrices are flattened integer vectors.
+The database column names `nplus`, `disc`, `det`, `rep`, and
+`discriminant_group_invs` are also supported.
+
+Use `LMFDBLite.new_search(db, "lat_genera"; kw...)` for raw records.
+"""
+function genera end

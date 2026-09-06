@@ -75,6 +75,9 @@ end
 
 import .SQL
 
+# Define the search condition type before Search.jl uses it in method signatures.
+abstract type Condition end
+
 ################################################################################
 #
 #  Connection type
@@ -82,7 +85,7 @@ import .SQL
 ################################################################################
 
 struct LMFDBConnection
-  conn::FunSQL.SQLConnection{LibPQ.Connection}
+  conn::FunSQL.SQLConnection{LibPQ.DBConnection}
   env#= properties of the connection =#
   table_names::Vector{String}
   table_layouts::Dict{String, SQL.TableLayout}
@@ -92,7 +95,7 @@ struct LMFDBConnection
                    dbname = "lmfdb",
                    user = "lmfdb",
                    password = "lmfdb")
-    conn = DBInterface.connect(FunSQL.DB{LibPQ.Connection},
+    raw = DBInterface.connect(LibPQ.Connection,
                                    """
                                    host=$host
                                    port=$port
@@ -100,7 +103,15 @@ struct LMFDBConnection
                                    user=$user
                                    password=$password
                                    """)
-    tnames, tlayouts = query_meta_data(conn)
-    return new(conn, (;host, port, dbname, user, password), tnames, tlayouts)
+    try
+      # FunSQL cannot infer the dialect from LibPQ's DBInterface adapter type.
+      catalog = FunSQL.reflect(raw; dialect = :postgresql)
+      conn = FunSQL.SQLConnection(raw; catalog)
+      tnames, tlayouts = query_meta_data(conn)
+      return new(conn, (;host, port, dbname, user, password), tnames, tlayouts)
+    catch
+      DBInterface.close!(raw)
+      rethrow()
+    end
   end
 end

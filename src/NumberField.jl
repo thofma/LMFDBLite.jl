@@ -1,22 +1,36 @@
-# (:id, :label, :degree, :r2, :cm, :iso_number, :disc_abs, :disc_sign, :disc_rad, :galt, :class_number, :class_group, :used_grh, :rd, :regulator, :ramps, :coeffs, :num_ram, :conductor, :subfields, :subfield_mults, :torsion_order, :galois_label, :is_galois, :gal_is_abelian, :gal_is_cyclic, :gal_is_solvable, :local_algs, :inessentialp, :index, :monogenic, :embeddings_gen_real, :embeddings_gen_imag, :is_minimal_sibling, :minimal_sibling, :galois_disc_exponents, :grd, :relative_class_number, :narrow_class_number, :narrow_class_group, :maximal_cm_subfield)
+"""
+    number_fields(db; limit = Inf, kw...)
 
-function _number_field_from_record(record::NamedTuple)
-  f = Hecke.Globals.Qx(BigInt.(record[:coeffs]))
-  K, = number_field(f; cached = false)
-  set_attribute!(K, :lmfdb_label => record[:label])
-  return K
-end
+Search number fields with `LMFDBLite.new_search` and convert each record to a
+Hecke number field with its `:lmfdb_label` attribute. Load Hecke with `using Hecke`
+to enable this method. Search parameters and `limit` are forwarded to `new_search`.
 
-function Hecke.number_field(db, label::String)
-  res = LMFDBLite.search(db, "nf_fields"; label = label)
-  @assert length(res) <= 1
-  if length(res) == 0
-    error("label does not exist")
-  end
-  return _number_field_from_record(res[1])
-end
+Supported parameters include:
 
-#function number_fields(db; kw...)
-#  res = LMFDBLite.search(db, "nf_fields"; kw...)
-#  return _number_field_from_record.(res)
-#end
+- `label`, `galois_group`: a string, `==(value)`, or `in([values...])`.
+  Galois groups use transitive labels such as `"4T2"`.
+- `signature`: `(r1, r2)` or `[r1, r2]`, optionally wrapped in `==`, where
+  `r1` counts real embeddings and `r2` counts pairs of complex embeddings.
+  This constrains the degree to `r1 + 2r2` as well as the signature.
+- `class_number`, `narrow_class_number`, `relative_class_number`, `index`:
+  an integer, a comparison (`==`, `<`, `<=`, `>`, `>=`), or `in` with an
+  integer vector or range. Combine bounds with `&`, e.g. `>=(2) & <=(10)`.
+- `class_group`, `narrow_class_group`: a vector of invariant factors in
+  increasing divisibility order, optionally wrapped in `==`. Use `Int[]`
+  for the trivial group.
+- `root_discriminant`, `galois_root_discriminant`, `regulator`: real values,
+  comparisons, or list membership. Inputs are converted to `Float64`;
+  equality compares with stored values, which may be rounded.
+- `is_galois`, `is_cyclic`, `is_abelian`, `is_solvable`, `is_cm`,
+  `is_minimal_sibling`: `true`, `false`, or an explicit equality.
+- `degree`, `discriminant`, `ramified`, `ramified_prime_count` are also available.
+
+For example, search for real quadratic fields with class number one but
+narrow class number two:
+
+```julia
+LMFDBLite.number_fields(db; signature = (2, 0), class_number = 1,
+                    narrow_class_number = 2, limit = 10)
+```
+"""
+function number_fields end

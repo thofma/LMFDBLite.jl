@@ -1,5 +1,3 @@
-abstract type Condition end
-
 struct AndC <: Condition
   a
   b
@@ -13,6 +11,17 @@ end
 struct PredC <: Condition
   symb
   op
+end
+
+function _assert_parameter_columns(c::PredC, columns, parameter)
+  @assert c.symb in columns "search parameter `$parameter` produced a condition for undeclared column `$(c.symb)`"
+  return nothing
+end
+
+function _assert_parameter_columns(c::Union{AndC, OrC}, columns, parameter)
+  _assert_parameter_columns(c.a, columns, parameter)
+  _assert_parameter_columns(c.b, columns, parameter)
+  return nothing
 end
 
 function create_cond(symb, v::Union{String, Number})
@@ -50,7 +59,6 @@ Base.:|(a::Condition, b::Condition) = OrC(a, b)
 function _create_where(conds::Vector)
   r = []
   for cond in conds
-    @info cond
     push!(r, create_fun(cond))
   end
   return Where(Fun.and(r...))
