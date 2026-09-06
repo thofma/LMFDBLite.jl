@@ -6,7 +6,7 @@ using DBInterface
 using FunSQL
 using LibPQ.Decimals
 
-import FunSQL: Where, Get, From, Fun, Select, Order, SQLTable, Limit
+import FunSQL: Where, Get, From, Fun, Select, Order, SQLTable, Limit, Agg, Group
 
 DBInterface.connect(::Type{LibPQ.Connection}, args...; kws...) =
     LibPQ.Connection(args...; kws...)
@@ -20,6 +20,7 @@ DBInterface.execute(conn::Union{LibPQ.Connection, LibPQ.Statement}, args...; kws
 include("Types.jl")
 include("TableLayout.jl")
 include("Search.jl")
+include("Conditions.jl")
 
 DBInterface.execute(conn::LMFDBConnection, args...; kw...) =
     DBInterface.execute(conn.conn, args...; kw...)

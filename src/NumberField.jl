@@ -16,7 +16,7 @@ function Hecke.number_field(db, label::String)
   return _number_field_from_record(res[1])
 end
 
-function number_fields(db; kw...)
-  res = LMFDBLite.search(db, "nf_fields"; kw...)
-  return _number_field_from_record.(res)
-end
+#function number_fields(db; kw...)
+#  res = LMFDBLite.search(db, "nf_fields"; kw...)
+#  return _number_field_from_record.(res)
+#end
