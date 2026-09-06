@@ -1,15 +1,7 @@
 """
-    genus(db, label)
+    genera(conn::LMFDBConnection; limit = Inf, kw...)
 
-Retrieve a Hecke genus of integer lattices by its LMFDB label.
-Load Hecke to enable this method.
-"""
-function genus end
-
-"""
-    genera(db; limit = Inf, kw...)
-
-Search `lat_genera` with `LMFDBLite.new_search` and construct Hecke genera from
+Search `lat_genera` with `LMFDBLite.search` and construct Hecke genera from
 their stored representative Gram matrices. Attach each genus's `:lmfdb_label`
 and cache lattice representatives when the database supplies the complete set.
 Load Hecke to enable this method.
@@ -26,6 +18,16 @@ equality, e.g. `mass = 1//2`. Gram matrices are flattened integer vectors.
 The database column names `nplus`, `disc`, `det`, `rep`, and
 `discriminant_group_invs` are also supported.
 
-Use `LMFDBLite.new_search(db, "lat_genera"; kw...)` for raw records.
+Use `LMFDBLite.search(conn, "lat_genera"; kw...)` for raw records.
 """
 function genera end
+
+"""
+    count_genera(conn::LMFDBConnection; limit = Inf, kw...)
+
+Count records in `lat_genera` using the same parameters as `genera` and
+`search`, without loading Hecke.
+"""
+function count_genera(conn::LMFDBConnection; limit = Inf, kw...)
+  return count(conn, "lat_genera"; limit, kw...)
+end

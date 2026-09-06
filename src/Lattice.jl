@@ -1,14 +1,14 @@
 """
-    integer_lattice(db, label)
+    integer_lattice(conn::LMFDBConnection, label::String)
 
 Retrieve a Hecke integer lattice by its LMFDB label. Load Hecke to enable this method.
 """
 function integer_lattice end
 
 """
-    integer_lattices(db; limit = Inf, kw...)
+    integer_lattices(conn::LMFDBConnection; limit = Inf, kw...)
 
-Search `lat_lattices_new` with `LMFDBLite.new_search` and convert the records to
+Search `lat_lattices_new` with `LMFDBLite.search` and convert the records to
 Hecke integer lattices, retaining their `:lmfdb_label` and available
 `:lmfdb_genus_label` attributes. Load Hecke to enable this method.
 
@@ -26,6 +26,16 @@ are integer vectors; both accept equality. `dual_determinant` uses `Float64` inp
 and compares stored numerical values. The database column names `nplus`, `disc`,
 and `discriminant_group_invs` are also supported.
 
-Use `LMFDBLite.new_search(db, "lat_lattices_new"; kw...)` for raw records.
+Use `LMFDBLite.search(conn, "lat_lattices_new"; kw...)` for raw records.
 """
 function integer_lattices end
+
+"""
+    count_integer_lattices(conn::LMFDBConnection; limit = Inf, kw...)
+
+Count records in `lat_lattices_new` using the same parameters as
+`integer_lattices` and `search`, without loading Hecke.
+"""
+function count_integer_lattices(conn::LMFDBConnection; limit = Inf, kw...)
+  return count(conn, "lat_lattices_new"; limit, kw...)
+end

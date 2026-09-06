@@ -84,6 +84,12 @@ abstract type Condition end
 #
 ################################################################################
 
+"""
+    LMFDBConnection(; host, port, dbname, user, password)
+
+Open an independently managed connection to an LMFDB PostgreSQL database.
+Use `lmfdb()` for the lazily constructed, cached default connection.
+"""
 struct LMFDBConnection
   conn::FunSQL.SQLConnection{LibPQ.DBConnection}
   env#= properties of the connection =#

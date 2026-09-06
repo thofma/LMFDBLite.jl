@@ -1,9 +1,9 @@
 """
-    number_fields(db; limit = Inf, kw...)
+    number_fields(conn::LMFDBConnection; limit = Inf, kw...)
 
-Search number fields with `LMFDBLite.new_search` and convert each record to a
+Search number fields with `LMFDBLite.search` and convert each record to a
 Hecke number field with its `:lmfdb_label` attribute. Load Hecke with `using Hecke`
-to enable this method. Search parameters and `limit` are forwarded to `new_search`.
+to enable this method. Search parameters and `limit` are forwarded to `search`.
 
 Supported parameters include:
 
@@ -29,8 +29,18 @@ For example, search for real quadratic fields with class number one but
 narrow class number two:
 
 ```julia
-LMFDBLite.number_fields(db; signature = (2, 0), class_number = 1,
+LMFDBLite.number_fields(conn; signature = (2, 0), class_number = 1,
                     narrow_class_number = 2, limit = 10)
 ```
 """
 function number_fields end
+
+"""
+    count_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+
+Count records in `nf_fields` using the same parameters as `number_fields` and
+`search` without constructing Hecke number fields.
+"""
+function count_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+  return count(conn, "nf_fields"; limit, kw...)
+end

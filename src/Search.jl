@@ -119,22 +119,22 @@ end
 #
 ################################################################################
 
-function check_table_name(db::LMFDBConnection, tname::String)
-  if !(tname in db.table_names)
+function check_table_name(conn::LMFDBConnection, tname::String)
+  if !(tname in conn.table_names)
     throw(ArgumentError("Table with name $(tname) does not exist; see `tables_names`"))
   end
 end
 
-function check_table_column_name(db::LMFDBConnection, tname::String, column::Symbol)
-  layout = db.table_layouts[tname].data # Dict{FieldName, SQL.ValueType}
+function check_table_column_name(conn::LMFDBConnection, tname::String, column::Symbol)
+  layout = conn.table_layouts[tname].data # Dict{FieldName, SQL.ValueType}
   if !(LMFDBLite.SQL.FieldName(column) in keys(layout))
     throw(ArgumentError("Table $(tname) does not have a column named \"$(column)\". See `table_layout`."))
   end
 end
 
-function table_layout(db::LMFDBConnection, tname::String)
-  check_table_name(db, tname)
-  return db.table_layouts[tname].data
+function table_layout(conn::LMFDBConnection, tname::String)
+  check_table_name(conn, tname)
+  return conn.table_layouts[tname].data
 end
 
 # A parameter can map to one column or to a tuple of columns (e.g. signature).
@@ -163,24 +163,26 @@ end
 
 function _search_parameters(tname::String)
   if tname == "nf_fields"
-    return _new_number_field_parameters()
+    return _number_field_parameters()
   elseif tname == "lat_lattices_new"
-    return _new_lattice_parameters()
+    return _lattice_parameters()
   elseif tname == "lat_genera"
-    return _new_genus_parameters()
+    return _genus_parameters()
+  elseif tname == "ec_curvedata"
+    return _elliptic_curve_parameters()
   end
-  throw(ArgumentError("new_search has no parameter definitions for table `$tname`"))
+  throw(ArgumentError("search has no parameter definitions for table `$tname`"))
 end
 
 """
-    check_search_parameters(db, table)
+    check_search_parameters(conn, table)
 
 Check all parameter declarations for `table` against the PostgreSQL metadata
-collected when `db` was opened. Return `nothing` on success, or report the
+collected when `conn` was opened. Return `nothing` on success, or report the
 parameter, column, and expected type on a mismatch. No additional queries are made.
 """
-function check_search_parameters(db::LMFDBConnection, tname::String)
-  layout = table_layout(db, tname)
+function check_search_parameters(conn::LMFDBConnection, tname::String)
+  layout = table_layout(conn, tname)
   for (parameter, spec) in _search_parameters(tname)
     _check_parameter_schema(layout, tname, parameter, spec)
   end
@@ -188,14 +190,14 @@ function check_search_parameters(db::LMFDBConnection, tname::String)
 end
 
 """
-    check_number_field_parameters(db)
+    check_number_field_parameters(conn)
 
-Check all number field declarations using `check_search_parameters(db, "nf_fields")`.
+Check all number field declarations using `check_search_parameters(conn, "nf_fields")`.
 """
-check_number_field_parameters(db::LMFDBConnection) = check_search_parameters(db, "nf_fields")
+check_number_field_parameters(conn::LMFDBConnection) = check_search_parameters(conn, "nf_fields")
 
-function _new_search_query(db::LMFDBConnection, tname::String; limit = Inf, kw...)
-  layout = table_layout(db, tname)
+function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
+  layout = table_layout(conn, tname)
   parameters = _search_parameters(tname)
   conds = Condition[]
   for (parameter, value) in kw
@@ -216,24 +218,24 @@ function _new_search_query(db::LMFDBConnection, tname::String; limit = Inf, kw..
 end
 
 """
-    new_search(db, table; limit = Inf, kw...)
+    search(conn, table; limit = Inf, kw...)
 
-Search `nf_fields`, `lat_lattices_new`, or `lat_genera` using their parameter
-registry. Return a vector of database records. Validate the columns and types
-against cached connection metadata before issuing the query.
+Search `nf_fields`, `ec_curvedata`, `lat_lattices_new`, or `lat_genera` using
+their parameter registry. Return a vector of database records. Validate the
+columns and types against cached connection metadata before issuing the query.
 """
-function new_search(db::LMFDBConnection, tname::String; limit = Inf, kw...)
-  return rowtable(DBInterface.execute(db.conn, _new_search_query(db, tname; limit, kw...)))
+function search(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
+  return rowtable(DBInterface.execute(conn.conn, _search_query(conn, tname; limit, kw...)))
 end
 
 """
-    count(db, table; limit = Inf, kw...)
+    count(conn, table; limit = Inf, kw...)
 
-Count records with the same parameter definitions and validation as `new_search`.
+Count records with the same parameter definitions and validation as `search`.
 """
-function count(db::LMFDBConnection, tname::String; limit = Inf, kw...)
-  q = _new_search_query(db, tname; limit, kw...) |> Group() |> Select(Agg.count())
-  return rowtable(DBInterface.execute(db.conn, q))[1][1]
+function count(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
+  q = _search_query(conn, tname; limit, kw...) |> Group() |> Select(Agg.count())
+  return rowtable(DBInterface.execute(conn.conn, q))[1][1]
 end
 
 
@@ -322,7 +324,14 @@ function __create_cond_signed_split(v::Base.Fix2{T}, k, kabs, ksign, origin, all
   if !(v.f in allowed)
     error("only the following allowed for `$origin`: $(join(allowed, " "))")
   end
-  return _create_cond_signed_split(v, k, kabs, ksign, allowed)
+  if v.f === in
+    return _create_cond_signed_split(v, k, kabs, ksign, allowed)
+  end
+  return _create_cond_signed_split(v, k, kabs, ksign)
+end
+
+function __create_cond_signed_split(v::Integer, k, kabs, ksign, origin, allowed::Vector)
+  return __create_cond_signed_split(==(BigInt(v)), k, kabs, ksign, origin, allowed)
 end
 
 function __create_cond_trafo(op::Base.Fix2, k, knew, trafo, origin, allowed::Vector)
@@ -389,85 +398,4 @@ end
 function _scalar_parameter(T, sqltype, column, allowed = Any[==, <=, >=, >, <, in]; transform = T)
   builder = (k, v, origin, ops) -> __create_cond_trafo(v, k, k, transform, origin, ops)
   return (T, sqltype, column, builder, allowed)
-end
-
-function _new_quadratic_parameters()
-  parameters = Dict(
-    :label => _scalar_parameter(String, SQL.text, :label, Any[==, in]),
-    :rank => _scalar_parameter(BigInt, SQL.smallint, :rank),
-    :signature => (Tuple{BigInt, BigInt}, (SQL.smallint, SQL.smallint), (:rank, :nplus), _create_lattice_signature_cond, Any[==]),
-    :nplus => _scalar_parameter(BigInt, SQL.smallint, :nplus),
-    :level => _scalar_parameter(BigInt, SQL.bigint, :level),
-    :class_number => _scalar_parameter(BigInt, SQL.smallint, :class_number),
-    :is_even => _scalar_parameter(Bool, SQL.boolean, :is_even, Any[==]),
-    :discriminant => _scalar_parameter(BigInt, SQL.bigint, :disc),
-    :disc_group_invs => _scalar_parameter(Vector{BigInt}, SQL.list{SQL.integer}, :discriminant_group_invs, Any[==]; transform = _vec_to_sql_array),
-    :discriminant_group_exponent => _scalar_parameter(BigInt, SQL.integer, :discriminant_group_exponent),
-    :conway_symbol => _scalar_parameter(String, SQL.text, :conway_symbol, Any[==, in]),
-    :dual_conway_symbol => _scalar_parameter(String, SQL.text, :dual_conway_symbol, Any[==, in]),
-    :scale => _scalar_parameter(BigInt, SQL.integer, :scale),
-  )
-  parameters[:disc] = parameters[:discriminant]
-  parameters[:discriminant_group_invs] = parameters[:disc_group_invs]
-  return parameters
-end
-
-function _new_lattice_parameters()
-  parameters = _new_quadratic_parameters()
-  merge!(parameters, Dict(
-    :genus_label => _scalar_parameter(String, SQL.text, :genus_label, Any[==, in]),
-    :minimum => _scalar_parameter(BigInt, SQL.integer, :minimum),
-    :automorphism_group_order => _scalar_parameter(BigInt, SQL.numeric, :aut_size),
-    :automorphism_group => _scalar_parameter(String, SQL.text, :aut_label, Any[==, in]),
-    :dual_determinant => _scalar_parameter(Float64, SQL.numeric, :dual_det),
-    :dual_kissing_number => _scalar_parameter(BigInt, SQL.bigint, :dual_kissing),
-    :gram_matrix => _scalar_parameter(Vector{BigInt}, SQL.list{SQL.integer}, :gram, Any[==]; transform = _vec_to_sql_array),
-    :kissing_number => _scalar_parameter(BigInt, SQL.bigint, :kissing),
-    :festi_veniani_index => _scalar_parameter(BigInt, SQL.numeric, :festi_veniani_index),
-  ))
-  return parameters
-end
-
-function _new_genus_parameters()
-  parameters = _new_quadratic_parameters()
-  merge!(parameters, Dict(
-    :determinant => _scalar_parameter(BigInt, SQL.bigint, :det),
-    :representative_gram_matrix => _scalar_parameter(Vector{BigInt}, SQL.list{SQL.integer}, :rep, Any[==]; transform = _vec_to_sql_array),
-    :discriminant_form => _scalar_parameter(Vector{BigInt}, SQL.list{SQL.integer}, :discriminant_form, Any[==]; transform = _vec_to_sql_array),
-    :mass => _scalar_parameter(Rational{BigInt}, SQL.list{SQL.numeric}, :mass, Any[==]; transform = x -> _prepare_for_lookup(Rational{BigInt}(x))),
-  ))
-  parameters[:det] = parameters[:determinant]
-  parameters[:rep] = parameters[:representative_gram_matrix]
-  return parameters
-end
-
-function _new_number_field_parameters()
-  # Entries declare (Julia input type, PostgreSQL type(s), column(s), builder, operators).
-  return Dict(
-    :label => (String, LMFDBLite.SQL.text, :label, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, identity, orig, allowed), Any[==, in]),
-    :signature => (Tuple{BigInt, BigInt}, (LMFDBLite.SQL.smallint, LMFDBLite.SQL.smallint), (:degree, :r2), _create_number_field_signature_cond, Any[==]),
-    :ramified => (Vector{BigInt}, LMFDBLite.SQL.list{LMFDBLite.SQL.numeric}, :ramps, _create_cond, Any[issetequal, issubset, issuperset, (==) => issetequal]), # where should I put the information that == might be issetequal?
-    :class_number => (BigInt, LMFDBLite.SQL.numeric, :class_number, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, BigInt, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :class_group => (Vector{BigInt}, LMFDBLite.SQL.jsonb, :class_group, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, _vec_to_string, orig, allowed), Any[==]),
-    :narrow_class_number => (BigInt, LMFDBLite.SQL.bigint, :narrow_class_number, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, BigInt, orig, allowed), Any[==, <=, >=, >, <, in]),
-    # Unlike class_group (JSON), narrow_class_group is a PostgreSQL bigint array.
-    :narrow_class_group => (Vector{BigInt}, LMFDBLite.SQL.list{LMFDBLite.SQL.bigint}, :narrow_class_group, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, _vec_to_sql_array, orig, allowed), Any[==]),
-    :relative_class_number => (BigInt, LMFDBLite.SQL.numeric, :relative_class_number, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, BigInt, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :discriminant => (BigInt, (LMFDBLite.SQL.numeric, LMFDBLite.SQL.smallint), (:disc_abs, :disc_sign), (k, v, orig, allowed) -> __create_cond_signed_split(v, k, k[1], k[2], orig, allowed), Any[==, <=, >=, >, <, in]),
-    # Equality and membership compare the stored floating-point root discriminants exactly.
-    :root_discriminant => (Float64, LMFDBLite.SQL.double, :rd, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Float64, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :galois_root_discriminant => (Float64, LMFDBLite.SQL.double, :grd, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Float64, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :regulator => (Float64, LMFDBLite.SQL.numeric, :regulator, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Float64, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :degree => (BigInt, LMFDBLite.SQL.smallint, :degree, _create_cond, Any[==, <=, >=, >, <, in]),
-    # Galois groups are stored as transitive group labels, e.g. "4T2".
-    :galois_group => (String, LMFDBLite.SQL.text, :galois_label, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, identity, orig, allowed), Any[==, in]),
-    :is_galois => (Bool, LMFDBLite.SQL.boolean, :is_galois, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :is_cyclic => (Bool, LMFDBLite.SQL.boolean, :gal_is_cyclic, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :is_abelian => (Bool, LMFDBLite.SQL.boolean, :gal_is_abelian, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :is_solvable => (Bool, LMFDBLite.SQL.boolean, :gal_is_solvable, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :is_cm => (Bool, LMFDBLite.SQL.boolean, :cm, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :is_minimal_sibling => (Bool, LMFDBLite.SQL.boolean, :is_minimal_sibling, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, Bool, orig, allowed), Any[==]),
-    :index => (BigInt, LMFDBLite.SQL.integer, :index, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, BigInt, orig, allowed), Any[==, <=, >=, >, <, in]),
-    :ramified_prime_count => (BigInt, LMFDBLite.SQL.smallint, :num_ram, _create_cond, Any[==, <=, >=, >, <, in])
-     )
 end

@@ -1,6 +1,6 @@
 @testset "Parameter consistency checks without a database" begin
     SQL = LMFDBLite.SQL
-    parameters = LMFDBLite._new_number_field_parameters()
+    parameters = LMFDBLite._number_field_parameters()
     spec = parameters[:narrow_class_group]
     # The user-facing types agree even though the PostgreSQL representations differ.
     @test parameters[:class_group][1] === spec[1] === Vector{BigInt}
@@ -56,32 +56,32 @@
     end
 end
 
-function test_number_field_parameter_consistency(db)
+function test_number_field_parameter_consistency(conn::LMFDBLite.LMFDBConnection)
     @testset "Number field parameter declarations match PostgreSQL" begin
-        @test isnothing(LMFDBLite.check_number_field_parameters(db))
-        layout = LMFDBLite.table_layout(db, "nf_fields")
-        @testset "$parameter" for (parameter, spec) in LMFDBLite._new_number_field_parameters()
+        @test isnothing(LMFDBLite.check_number_field_parameters(conn))
+        layout = LMFDBLite.table_layout(conn, "nf_fields")
+        @testset "$parameter" for (parameter, spec) in LMFDBLite._number_field_parameters()
             @test isnothing(LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, spec))
         end
 
-        # Change only the cached metadata to verify that new_search enforces the check.
+        # Change only the cached metadata to verify that search enforces the check.
         # Always restore it before running the remaining live queries.
         column = LMFDBLite.SQL.FieldName(:narrow_class_group)
         original = layout[column]
         try
             layout[column] = LMFDBLite.SQL.jsonb()
-            @test_throws ErrorException LMFDBLite.new_search(db, "nf_fields";
+            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
                 narrow_class_group = [2], limit = 1)
             delete!(layout, column)
-            @test_throws ErrorException LMFDBLite.new_search(db, "nf_fields";
+            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
                 narrow_class_group = [2], limit = 1)
         finally
             layout[column] = original
         end
-        @test isnothing(LMFDBLite.check_number_field_parameters(db))
-        @test_throws ArgumentError LMFDBLite.new_search(db, "nf_fields";
+        @test isnothing(LMFDBLite.check_number_field_parameters(conn))
+        @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
             unknown_parameter = 1, limit = 1)
         # Unsupported tables must not silently receive number field definitions.
-        @test_throws ArgumentError LMFDBLite.new_search(db, "lat_lattices"; limit = 1)
+        @test_throws ArgumentError LMFDBLite.search(conn, "lat_lattices"; limit = 1)
     end
 end

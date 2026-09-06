@@ -1,12 +1,18 @@
 These tests make read-only queries against the live LMFDB PostgreSQL database
-used by `LMFDBLite.LMFDBConnection()` (`devmirror.lmfdb.xyz:5432` by default).
+used by `LMFDBLite.lmfdb()` (`devmirror.lmfdb.xyz:5432` by default).
 They require network access; connection failures fail the test run.
 
+Connection tests verify that `lmfdb()` constructs its default connection
+lazily, returns the same object across calls and tasks, invalidates the cache
+when closed, and reconstructs it on demand. Type-specific count functions are
+checked against their corresponding raw searches.
+
 The test runner first checks that LMFDBLite loads without Hecke, then loads Hecke
-to activate `LMFDBLiteHeckeExt` and test the number field conversions. Hecke is a
-test dependency and an optional dependency of LMFDBLite. In a user session, load both
-packages with `using LMFDBLite, Hecke` before calling `LMFDBLite.number_fields`; raw
-searches through `LMFDBLite.new_search` do not require Hecke.
+to activate `LMFDBLiteHeckeExt` and test conversion to number fields, elliptic
+curves, integer lattices, and genera. Hecke is a test dependency and an optional
+dependency of LMFDBLite. In a user session, load both packages with
+`using LMFDBLite, Hecke` before calling conversion functions; raw searches
+through `LMFDBLite.search` do not require Hecke.
 
 Parameter consistency tests check every declared PostgreSQL column and type
 against the live connection metadata, including both columns used by signature
@@ -16,9 +22,9 @@ These checks distinguish `class_group` (`jsonb`) from `narrow_class_group`
 (`bigint[]`) while requiring their Julia input types to agree.
 
 You can run the complete declaration check on an existing connection with
-`LMFDBLite.check_number_field_parameters(db)`, or use
-`LMFDBLite.check_search_parameters(db, table)` for any supported table.
-Each `new_search` call checks
+`LMFDBLite.check_number_field_parameters(conn)`, or use
+`LMFDBLite.check_search_parameters(conn, table)` for any supported table.
+Each `search` call checks
 the parameters it uses before issuing the query. The checks use metadata cached
 when the connection was opened, so reconnect to check a changed database schema.
 
@@ -41,13 +47,16 @@ and the cyclic, abelian, solvable, CM, and minimal sibling flags. They compare
 filtered results with raw database records, including integer ranges, empty
 results, missing relative class numbers, and Hecke conversion with combined filters.
 
-All record retrieval uses `new_search`, which now supports `nf_fields`,
-`lat_lattices_new`, and `lat_genera`. The old `search` function and lattice
-validation framework have been removed. `count` shares the parameter validation
-and query construction used by `new_search`.
+All record retrieval uses `search`, which supports `nf_fields`, `ec_curvedata`,
+`lat_lattices_new`, and `lat_genera`. The previous search implementation and
+lattice validation framework have been removed. `count` shares the parameter
+validation and query construction used by `search`.
 
 Lattice and genus tests check parameter schemas, signatures, numeric and array
 filters, rational mass equality, counts, limits, empty results, label lookups,
 Hecke conversion, and retrieval of genus representatives. Incomplete representative
-sets are not cached as complete sets. Use `new_search` for raw records and the
+sets are not cached as complete sets. Use `search` for raw records and the
 Hecke extension methods for mathematical objects; there is no separate `raw` mode.
+
+Elliptic-curve tests check the `ec_curvedata` parameter schema, scalar and array
+filters, signed discriminants, counts, and conversion to Hecke elliptic curves.
