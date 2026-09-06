@@ -1,5 +1,7 @@
 module LMFDBLite
 
+export number_fields, elliptic_curves, integer_lattices, genera
+
 using LibPQ
 using Tables
 using DBInterface

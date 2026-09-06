@@ -27,13 +27,13 @@ function test_elliptic_curves(conn::LMFDBLite.LMFDBConnection)
         @test labels(LMFDBLite.search(conn, table; discriminant)) == Set([sample.lmfdb_label])
         @test_throws ArgumentError LMFDBLite.search(conn, table; genus_label = "x", limit = 1)
 
-        E = LMFDBLite.elliptic_curve(conn, sample.lmfdb_label)
+        E = Hecke.elliptic_curve(conn, sample.lmfdb_label)
         @test collect(Hecke.a_invariants(E)) == Hecke.QQ.(ainvs)
         @test Hecke.get_attribute(E, :lmfdb_label) == sample.lmfdb_label
         curves = LMFDBLite.elliptic_curves(conn; conductor = 11, torsion_structure = [5])
         @test length(curves) == 2
         @test Set(Hecke.get_attribute(C, :lmfdb_label) for C in curves) == Set(["11.a2", "11.a3"])
         @test isempty(LMFDBLite.elliptic_curves(conn; conductor = 11, limit = 0))
-        @test_throws ErrorException LMFDBLite.elliptic_curve(conn, "not-an-elliptic-curve-label")
+        @test_throws ErrorException Hecke.elliptic_curve(conn, "not-an-elliptic-curve-label")
     end
 end

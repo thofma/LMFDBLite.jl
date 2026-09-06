@@ -10,6 +10,10 @@ using Test
     @test !isdefined(LMFDBLite, :number_field)
     @test !isdefined(LMFDBLite, :elliptic_curve)
     @test !isdefined(LMFDBLite, :genus)
+    @test number_fields === LMFDBLite.number_fields
+    @test elliptic_curves === LMFDBLite.elliptic_curves
+    @test integer_lattices === LMFDBLite.integer_lattices
+    @test genera === LMFDBLite.genera
     @test isempty(methods(LMFDBLite.number_fields))
     @test isempty(methods(LMFDBLite.elliptic_curves))
     @test haskey(LMFDBLite._number_field_parameters(), :galois_group)
@@ -26,14 +30,14 @@ using Hecke
 
 @testset "Hecke extension" begin
     @test Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt) !== nothing
-    @test LMFDBLite.number_field === Hecke.number_field
-    @test LMFDBLite.elliptic_curve === Hecke.elliptic_curve
-    @test LMFDBLite.genus === Hecke.genus
+    @test !isdefined(LMFDBLite, :number_field)
+    @test !isdefined(LMFDBLite, :elliptic_curve)
+    @test !isdefined(LMFDBLite, :genus)
     @test hasmethod(Hecke.number_field, Tuple{LMFDBLite.LMFDBConnection, String})
+    @test hasmethod(Hecke.elliptic_curve, Tuple{LMFDBLite.LMFDBConnection, String})
+    @test hasmethod(Hecke.genus, Tuple{LMFDBLite.LMFDBConnection, String})
     @test hasmethod(LMFDBLite.number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.integer_lattice, Tuple{LMFDBLite.LMFDBConnection, String})
-    @test hasmethod(LMFDBLite.genus, Tuple{LMFDBLite.LMFDBConnection, String})
-    @test hasmethod(LMFDBLite.elliptic_curve, Tuple{LMFDBLite.LMFDBConnection, String})
 end
 
 # Use the package's default public database, with optional connection overrides.

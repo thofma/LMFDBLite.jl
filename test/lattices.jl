@@ -114,13 +114,13 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         @test length(LMFDBLite.genera(conn; label = in(pool), limit = 1)) == 1
         @test isempty(LMFDBLite.genera(conn; rank = 1, limit = 0))
         @test isempty(LMFDBLite.genera(conn; label = in(String[])))
-        @test_throws ErrorException LMFDBLite.genus(conn, "no-such-genus")
+        @test_throws ErrorException Hecke.genus(conn, "no-such-genus")
 
         # This small genus has its complete representative set in the lattice table.
         label = "1.1.1.3"
         record = only(LMFDBLite.search(conn, "lat_genera"; label))
         lattice_records = LMFDBLite.search(conn, "lat_lattices_new"; genus_label = label)
-        G = LMFDBLite.genus(conn, label)
+        G = Hecke.genus(conn, label)
         @test Hecke.get_attribute(G, :lmfdb_label) == label
         @test length(lattice_records) == record.class_number == 1
         @test Hecke.has_attribute(G, :representatives)

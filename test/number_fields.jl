@@ -264,14 +264,11 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
         @testset "Single-label Hecke conversion" begin
             label = "2.2.5.1"
             record = only(LMFDBLite.search(conn, "nf_fields"; label))
-            K = LMFDBLite.number_field(conn, label)
-            K_hecke = Hecke.number_field(conn, label)
+            K = Hecke.number_field(conn, label)
             expected_polynomial = Hecke.Globals.Qx(BigInt.(record.coeffs))
             @test Hecke.defining_polynomial(K) == expected_polynomial
-            @test Hecke.defining_polynomial(K_hecke) == expected_polynomial
             @test Hecke.get_attribute(K, :lmfdb_label) == label
-            @test Hecke.get_attribute(K_hecke, :lmfdb_label) == label
-            @test_throws ErrorException LMFDBLite.number_field(conn, "not-a-number-field-label")
+            @test_throws ErrorException Hecke.number_field(conn, "not-a-number-field-label")
         end
     end
 end
