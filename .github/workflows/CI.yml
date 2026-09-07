@@ -1,0 +1,39 @@
+name: Run tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref != 'refs/heads/main' || github.run_number }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+jobs:
+  test:
+    name: Julia ${{ matrix.julia-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version:
+          - '1.10'
+          - '1.11'
+          - '1.12'
+          - '1.13-nightly'
+          - 'nightly'
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.julia-version }}
+      - name: Cache artifacts
+        uses: julia-actions/cache@v3
+      - name: Build package
+        uses: julia-actions/julia-buildpkg@v1
+      - name: Run tests
+        uses: julia-actions/julia-runtest@v1
