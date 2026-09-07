@@ -1,6 +1,6 @@
 module LMFDBLite
 
-export lmfdb, includes
+export lmfdb, includes, reset!
 
 using LibPQ
 using Tables
@@ -28,6 +28,18 @@ const _lmfdb_lock = ReentrantLock()
 const _lmfdb_cache = Ref{Union{Nothing, LMFDBConnection}}(nothing)
 
 Base.isopen(conn::LMFDBConnection) = isopen(conn.conn.raw.conn)
+
+"""
+    reset!(conn::LMFDBConnection; throw_error = true)
+
+Reset communication with the LMFDB PostgreSQL server using the connection's
+original parameters. A connection that has been explicitly closed cannot be
+reset.
+"""
+function LibPQ.reset!(conn::LMFDBConnection; throw_error::Bool = true)
+  LibPQ.reset!(conn.conn.raw.conn; throw_error)
+  return nothing
+end
 
 DBInterface.execute(conn::LMFDBConnection, args...; kw...) =
   DBInterface.execute(conn.conn, args...; kw...)

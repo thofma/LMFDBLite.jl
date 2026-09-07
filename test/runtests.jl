@@ -12,7 +12,9 @@ using Test
     @test !isdefined(LMFDBLite, :genus)
     @test lmfdb === LMFDBLite.lmfdb
     @test includes === LMFDBLite.includes
-    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb))
+    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!))
+    @test reset! === LMFDBLite.reset!
+    @test hasmethod(reset!, Tuple{LMFDBLite.LMFDBConnection})
     @test isempty(methods(LMFDBLite.number_fields))
     @test isempty(methods(LMFDBLite.elliptic_curves))
     @test haskey(LMFDBLite._number_field_parameters(), :galois_group)
@@ -51,6 +53,14 @@ end
 @testset "LMFDB live database tests" begin
     conn = LMFDBLite.LMFDBConnection(; connection_options...)
     try
+        @test reset!(conn) === nothing
+        @test isopen(conn)
+        @test sprint(show, conn) ==
+            "LMFDB database connection to $(conn.env.host):$(conn.env.port)"
+        @test sprint(show, MIME"text/plain"(), conn) ==
+            "Connection to the LMFDB database\n" *
+            "  host: $(conn.env.host)\n" *
+            "  port: $(conn.env.port)"
         @testset "Cached default connection" begin
             cached = LMFDBLite.lmfdb()
             @test cached isa LMFDBLite.LMFDBConnection

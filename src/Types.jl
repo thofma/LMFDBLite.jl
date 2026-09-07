@@ -121,3 +121,13 @@ struct LMFDBConnection
     end
   end
 end
+
+function Base.show(io::IO, conn::LMFDBConnection)
+  print(io, "LMFDB database connection to ", conn.env.host, ":", conn.env.port)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", conn::LMFDBConnection)
+  println(io, "Connection to the LMFDB database")
+  println(io, "  host: ", conn.env.host)
+  print(io, "  port: ", conn.env.port)
+end
