@@ -18,8 +18,8 @@ records = LMFDBLite.search(conn, "nf_fields";
 The call `lmfdb()` constructs the default `LMFDBConnection` on its first call and
 returns that cached connection on subsequent calls. Construct
 `LMFDBConnection(; host, port, dbname, user, password)` directly when a custom,
-independently managed connection is needed. Call `reset!(conn)` to re-establish
-communication using the connection's original parameters.
+independently managed connection is needed. Call `reset!(conn)` to reset the
+connection to the [LMFDB](https://www.lmfdb.org/).
 
 The function `search` returns a vector of named tuples.
 
@@ -66,9 +66,10 @@ error.
 
 ## Hecke and Oscar integration
 
-LMFDBLite comes with an optional interface to directly construct native Hecke
-or Oscar objects when querying the database. The functionality is available after loading
-either package.
+LMFDBLite comes with an optional interface to directly construct native
+[Hecke](https://github.com/thofma/Hecke.jl) or
+[Oscar](https://github.com/oscar-system/Oscar.jl) objects when querying the
+database. The functionality is available after loading either package.
 
 ```julia
 julia> using LMFDBLite, Hecke
