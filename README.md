@@ -64,7 +64,7 @@ error.
   `issubset(values)` selects stored arrays contained in the specified values.
 - In all cases, `x = val` is shorthand for `x = ==(val)`.
 
-## Oscar and Hecke integration
+## Hecke and Oscar integration
 
 LMFDBLite comes with an optional interface to directly construct native Hecke
 or Oscar objects when querying the database. The functionality is available after loading
