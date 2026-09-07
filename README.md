@@ -1,8 +1,9 @@
 # LMFDBLite.jl
 
-A Julia interface to the LMFDB PostgreSQL database, with optional Hecke support
-for constructing number fields, elliptic curves over the rationals, integer
-lattices, and genera.
+A Julia interface to the [LMFDB](https://www.lmfdb.org/), with optional
+[Hecke](https://github.com/thofma/Hecke.jl) and
+[Oscar](https://github.com/oscar-system/Oscar.jl) support for constructing
+number fields, elliptic curves over the rationals, integer lattices, and genera.
 
 ## Quick example
 
