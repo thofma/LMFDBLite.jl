@@ -10,10 +10,9 @@ using Test
     @test !isdefined(LMFDBLite, :number_field)
     @test !isdefined(LMFDBLite, :elliptic_curve)
     @test !isdefined(LMFDBLite, :genus)
-    @test number_fields === LMFDBLite.number_fields
-    @test elliptic_curves === LMFDBLite.elliptic_curves
-    @test integer_lattices === LMFDBLite.integer_lattices
-    @test genera === LMFDBLite.genera
+    @test lmfdb === LMFDBLite.lmfdb
+    @test includes === LMFDBLite.includes
+    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb))
     @test isempty(methods(LMFDBLite.number_fields))
     @test isempty(methods(LMFDBLite.elliptic_curves))
     @test haskey(LMFDBLite._number_field_parameters(), :galois_group)

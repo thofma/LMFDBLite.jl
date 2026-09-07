@@ -32,10 +32,6 @@ end
 
 issuperset(x) = Base.Fix2(issuperset, x)
 
-export issuperset
-
-export includes
-
 includes = issuperset
 
 #            - ``$contains`` -- for json columns, the given value should be a subset of the column.
