@@ -12,6 +12,10 @@ function test_elliptic_curves(conn::LMFDBLite.LMFDBConnection)
         @test LMFDBLite.count(conn, table; conductor = 11) == 3
         @test LMFDBLite.count_elliptic_curves(conn; conductor = 11) == 3
 
+        signed_bounds = (; conductor = in([11, 37]))
+        signed_reference = LMFDBLite.search(conn, table; signed_bounds...)
+        test_live_discriminants(conn, table, signed_reference; signed_bounds...)
+
         labels(rows) = Set(r.lmfdb_label for r in rows)
         @test labels(LMFDBLite.search(conn, table; isogeny_class = "11.a")) == labels(reference)
         @test labels(LMFDBLite.search(conn, table; label = in(["11.a1", "11.a3"]))) == Set(["11.a1", "11.a3"])

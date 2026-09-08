@@ -65,6 +65,12 @@ error.
   `issubset(values)` selects stored arrays contained in the specified values.
 - In all cases, `x = val` is shorthand for `x = ==(val)`.
 
+Signed `discriminant` searches for number fields and elliptic curves convert
+operands using `BigInt(x)`, including operands inside comparisons and membership
+vectors or ranges. This also supports Oscar/Hecke integers (`ZZRingElem`).
+Unit-step ranges in either direction are kept compact; use an explicit vector
+for membership with other steps. Empty membership matches no records.
+
 ## Hecke and Oscar integration
 
 LMFDBLite comes with an optional interface to directly construct native

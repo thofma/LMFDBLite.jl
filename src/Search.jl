@@ -274,6 +274,11 @@ function _create_cond_signed_split(v::LMFDBLite.And, k, kabs, ksign)
                  _create_cond_signed_split(v.b, k, kabs, ksign))
 end
 
+function _create_cond_signed_split(v::LMFDBLite.Or, k, kabs, ksign)
+  LMFDBLite.OrC(_create_cond_signed_split(v.a, k, kabs, ksign),
+                _create_cond_signed_split(v.b, k, kabs, ksign))
+end
+
 function _create_cond_signed_split(v::Base.Fix2{typeof(>=)}, k, kabs, ksign)
   a = v.x
   @assert a isa BigInt
@@ -302,32 +307,63 @@ function _create_cond_signed_split(v::Base.Fix2{typeof(>)}, k, kabs, ksign)
           (LMFDBLite.PredC(kabs, <(-a)) & LMFDBLite.PredC(ksign, ==(-1)))
 end
 
-function _create_cond_signed_split(v::Base.Fix2{typeof(in)}, k, kabs, ksign, allowed::Vector, error = nothing)
+function _create_cond_signed_split(v::Base.Fix2{typeof(in)}, k, kabs, ksign)
   a = v.x
+  isempty(a) && return FalseC()
   if a isa Vector{BigInt}
     return reduce(LMFDBLite.OrC, [_create_cond_signed_split(==(b), k, kabs, ksign) for b in a])
   else
-    @assert a isa AbstractUnitRange
+    @assert a isa AbstractUnitRange{BigInt}
     lb = first(a)
     ub = last(a)
-    @assert step(a) == 1
-    return (LMFDBLite.PredC(kabs, in(max(first(a), 0):last(a))) & LMFDBLite.PredC(ksign, ==(1))) |
-           (LMFDBLite.PredC(kabs, in(max(last(-a), 0):first(-a))) & LMFDBLite.PredC(ksign, ==(-1)))
+    positive = max(lb, 0):ub
+    negative = max(-ub, 0):(-lb)
+    pos = isempty(positive) ? FalseC() : PredC(kabs, in(positive)) & PredC(ksign, ==(1))
+    neg = isempty(negative) ? FalseC() : PredC(kabs, in(negative)) & PredC(ksign, ==(-1))
+    return pos | neg
   end
 end
 
-function __create_cond_signed_split(v::Base.Fix2{T}, k, kabs, ksign, origin, allowed::Vector) where {T}
-  if !(v.f in allowed)
-    error("only the following allowed for `$origin`: $(join(allowed, " "))")
+# BigInt(x) is the conversion hook, including for types supplied by optional
+# packages (such as Oscar/Hecke's ZZRingElem), without requiring Integer subtyping.
+function _discriminant_bigint(x, origin)
+  try
+    return BigInt(x)
+  catch err
+    err isa Union{MethodError, InexactError, ArgumentError, DomainError, OverflowError} || rethrow()
+    throw(ArgumentError("search parameter `$origin` requires values convertible to BigInt; cannot convert $(typeof(x))"))
   end
-  if v.f === in
-    return _create_cond_signed_split(v, k, kabs, ksign, allowed)
-  end
-  return _create_cond_signed_split(v, k, kabs, ksign)
 end
 
-function __create_cond_signed_split(v::Integer, k, kabs, ksign, origin, allowed::Vector)
-  return __create_cond_signed_split(==(BigInt(v)), k, kabs, ksign, origin, allowed)
+function _normalize_discriminant(v::Base.Fix2, origin, allowed)
+  v.f in allowed || throw(ArgumentError("only the following allowed for `$origin`: $(join(allowed, " "))"))
+  if v.f !== in
+    return Base.Fix2(v.f, _discriminant_bigint(v.x, origin))
+  end
+  a = v.x
+  if a isa AbstractRange
+    stride = _discriminant_bigint(step(a), origin)
+    abs(stride) == 1 || throw(ArgumentError("search parameter `$origin` supports only unit-step ranges; use an explicit vector for stepped membership"))
+    isempty(a) && return in(BigInt[])
+    lb = _discriminant_bigint(first(a), origin)
+    ub = _discriminant_bigint(last(a), origin)
+    return in(stride == 1 ? (lb:ub) : (ub:lb))
+  elseif a isa AbstractVector
+    return in(BigInt[_discriminant_bigint(x, origin) for x in a])
+  end
+  throw(ArgumentError("search parameter `$origin` requires a vector or unit-step range for membership"))
+end
+
+function _normalize_discriminant(v::Union{And, Or}, origin, allowed)
+  return typeof(v)(_normalize_discriminant(v.a, origin, allowed),
+                   _normalize_discriminant(v.b, origin, allowed))
+end
+
+_normalize_discriminant(v, origin, allowed) = _normalize_discriminant(==(v), origin, allowed)
+
+function __create_cond_signed_split(v, k, kabs, ksign, origin, allowed::Vector)
+  normalized = _normalize_discriminant(v, origin, allowed)
+  return _create_cond_signed_split(normalized, k, kabs, ksign)
 end
 
 function __create_cond_trafo(op::Base.Fix2, k, knew, trafo, origin, allowed::Vector)
