@@ -1,9 +1,12 @@
-# LMFDBLite.jl
+# LMFDBLite
 
 A Julia interface to the [LMFDB](https://www.lmfdb.org/), with optional
 [Hecke](https://github.com/thofma/Hecke.jl) and
 [Oscar](https://github.com/oscar-system/Oscar.jl) support for constructing
-number fields, elliptic curves over the rationals, integer lattices, and genera.
+number fields, elliptic curves, integer lattices, and genera of integer lattices.
+
+This package was inspired by the Python
+[lmfdb-lite](https://github.com/roed314/lmfdb-lite) package.
 
 ## Quick example
 
@@ -17,27 +20,7 @@ records = LMFDBLite.search(conn, "nf_fields";
 ```
 
 The call `lmfdb()` constructs the default `LMFDBConnection` on its first call and
-returns that cached connection on subsequent calls. Construct
-`LMFDBLite.LMFDBConnection(; host, port, dbname, user, password, schema = "public")`
-directly when a custom, independently managed connection is needed. Call `reset!(conn)` to reset the
-connection to the [LMFDB](https://www.lmfdb.org/).
-
-Connection values may contain spaces, quotes, or backslashes; pass their literal
-values without adding connection-string escaping. The constructor also accepts
-`connect_timeout` (initial connection timeout in seconds, default `0` for none)
-and libpq's `sslmode`, `sslrootcert`, `sslcert`, and `sslkey`
-[TLS options](https://www.postgresql.org/docs/current/libpq-connect.html). TLS
-options default to `nothing`, preserving libpq's environment/default settings.
-The connection timeout does not limit queries or `reset!`.
-
-The connection reflects tables in the selected schema and uses that same schema
-for searches and column metadata, independently of PostgreSQL's `search_path`.
-It loads and caches a table's column types on first use, so unsupported types in
-unrelated tables do not prevent connecting or searching supported tables.
-Search parameter validation still reports missing columns and incorrect types.
-Requesting a layout containing an unsupported type raises an error for that
-table. Open a new connection after a schema change to refresh reflected tables
-and cached layouts; `reset!` only resets communication with the server.
+returns that cached connection on subsequent calls.
 
 The function `search` returns a vector of named tuples.
 
@@ -103,37 +86,8 @@ supported by that parameter. Different keyword parameters are combined with AND.
 With one argument, `allof` and `anyof` return that argument unchanged; with no
 arguments, they raise `ArgumentError`.
 
-The existing `&(Function, Function)` overload remains available for combining two
-predicates. Use `allof` and `anyof` for longer or mixed combinations; direct `|`
+Use `allof` and `anyof` for longer or mixed combinations; direct `|`
 between predicates and chains of `&` are not supported.
-
-All scalar integer parameters, including signed discriminants, and the
-number-field `ramified` parameter convert operands using `BigInt(x)`. This
-includes values inside comparisons and vectors, and supports Oscar/Hecke
-integers (`ZZRingElem`). Integer membership ranges with step `1` or `-1` are
-handled using their endpoints, without expanding their elements. This applies
-to `Int`, `BigInt`, and Oscar/Hecke ranges on all four tables. Empty unit-step
-ranges and empty membership vectors match no records. `ramified` operands must
-be explicit vectors. Unsupported operators and invalid operands for these
-parameters consistently raise `ArgumentError`, also inside combined conditions.
-
-**Compatibility change for stepped integer ranges:** some parameters previously
-accepted ranges such as `class_number = in(1:2:9)` by expanding them into lists.
-All scalar integer parameters now reject ranges whose step is neither `1` nor
-`-1` with `ArgumentError`, including empty and singleton ranges. This prevents
-implicit expansion of large ranges and applies inside `allof` and `anyof` too.
-To request discrete values, supply an explicit vector:
-
-```julia
-# Previously accepted; now raises ArgumentError:
-LMFDBLite.search(conn, "nf_fields"; class_number = in(1:2:9))
-
-# Explicit replacements with the same discrete membership:
-LMFDBLite.search(conn, "nf_fields"; class_number = in([1, 3, 5, 7, 9]))
-LMFDBLite.search(conn, "nf_fields"; class_number = in(collect(1:2:9)))
-```
-
-An explicit vector matches only its listed values; the gaps are not filled in.
 
 ## Hecke and Oscar integration
 
@@ -177,5 +131,26 @@ Use `count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`,
 and `count_genera` to count matching records without constructing Hecke
 objects.
 
-This package was inspired by the Python
-[lmfdb-lite project](https://github.com/roed314/lmfdb-lite).
+## Custom connection
+
+Construct
+`LMFDBLite.LMFDBConnection(; host, port, dbname, user, password, schema = "public")`
+directly when a custom, independently managed connection is needed. Call `reset!(conn)` to reset the
+connection to the lmfdb.
+
+Connection values may contain spaces, quotes, or backslashes; pass their literal
+values without adding connection-string escaping. The constructor also accepts
+`connect_timeout` (initial connection timeout in seconds, default `0` for none)
+and libpq's `sslmode`, `sslrootcert`, `sslcert`, and `sslkey`
+[TLS options](https://www.postgresql.org/docs/current/libpq-connect.html). TLS
+options default to `nothing`, preserving libpq's environment/default settings.
+The connection timeout does not limit queries or `reset!`.
+
+The connection reflects tables in the selected schema and uses that same schema
+for searches and column metadata, independently of PostgreSQL's `search_path`.
+It loads and caches a table's column types on first use, so unsupported types in
+unrelated tables do not prevent connecting or searching supported tables.
+Search parameter validation still reports missing columns and incorrect types.
+Requesting a layout containing an unsupported type raises an error for that
+table. Open a new connection after a schema change to refresh reflected tables
+and cached layouts; `reset!` only resets communication with the server.
