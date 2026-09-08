@@ -63,13 +63,21 @@ error.
 - For set-like array parameters, `includes(values)` requires the stored array
   to contain every specified value. For example, `ramified = includes([2, 3])`.
   `issubset(values)` selects stored arrays contained in the specified values.
+- For `ramified`, bare vectors and `==(values)` use set equality: `[2, 3]`,
+  `[3, 2]`, and `[2, 2, 3]` specify the same ramified primes. An explicit
+  `issetequal` predicate is also supported. `ramified = includes(Int[])` imposes
+  no required primes; `ramified = Int[]` or `ramified = issubset(Int[])` selects
+  empty ramification sets. Class-group equality remains order-sensitive.
 - In all cases, `x = val` is shorthand for `x = ==(val)`.
 
-Signed `discriminant` searches for number fields and elliptic curves convert
-operands using `BigInt(x)`, including operands inside comparisons and membership
-vectors or ranges. This also supports Oscar/Hecke integers (`ZZRingElem`).
-Unit-step ranges in either direction are kept compact; use an explicit vector
-for membership with other steps. Empty membership matches no records.
+Signed `discriminant` searches for number fields and elliptic curves, and number
+field `degree`, `ramified_prime_count`, and `ramified` searches, convert operands
+using `BigInt(x)`. This includes values inside comparisons and vectors, and
+supports Oscar/Hecke integers (`ZZRingElem`). For scalar membership, unit-step
+ranges in either direction are kept compact; use an explicit vector for other
+steps. Empty scalar membership matches no records. `ramified` operands must be
+explicit vectors. Unsupported operators and invalid operands for these
+parameters raise `ArgumentError`, also inside combined conditions.
 
 ## Hecke and Oscar integration
 

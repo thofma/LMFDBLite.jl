@@ -1,3 +1,7 @@
+# Builders produce this tree over physical columns. PredC stores a column and
+# its predicate; AndC/OrC combine conditions, including expansions of a single
+# user predicate into several column predicates. create_fun renders the tree to
+# FunSQL, and _create_where combines the separate keyword conditions with AND.
 struct AndC <: Condition
   a
   b
@@ -13,8 +17,12 @@ struct PredC <: Condition
   op
 end
 
+# A column-free false predicate, used for empty scalar membership. Empty operands
+# of set containment retain their predicates because their truth values differ.
 struct FalseC <: Condition end
 
+# This checks column ownership after building; operator and operand validation
+# belongs to the parameter builder, before SQL rendering.
 _assert_parameter_columns(::FalseC, columns, parameter) = nothing
 
 function _assert_parameter_columns(c::PredC, columns, parameter)

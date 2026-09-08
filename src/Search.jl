@@ -201,6 +201,8 @@ function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
     spec = parameters[parameter]
     _check_parameter_schema(layout, tname, parameter, spec)
     _, _, column, builder, allowed = spec
+    # Builders receive physical column(s), the user value, its public parameter
+    # name (for errors), and allowed operators. They return a Condition tree.
     cond = builder(column, value, parameter, allowed)
     columns, _ = _parameter_columns_and_types(spec)
     _assert_parameter_columns(cond, columns, parameter)
@@ -237,46 +239,81 @@ end
 
 ################################################################################
 #
-#  Parameter type
+#  Condition normalization and construction
 #
 ################################################################################
 
-# We need to store more information
-# for example search for padic_completions:
-# Input: "string"; Backend type: list{text}; allowed search; = or == means input in datastored
+# Pipeline: keyword value -> registry builder -> Condition tree -> FunSQL -> SQL.
 #
-# for rank
-# Input: "int"; backend type: int; allowed search "numeric"
+# Each registry entry declares an input type, SQL type(s), physical column(s),
+# builder, and allowed operators. _search_query checks the cached schema before
+# calling the builder, then verifies that its Condition uses only declared columns.
+# The declared input type describes the parameter; the builder performs conversion.
 #
-# for ramified primes
-# input: "list{int}", backend type list{int}; allowed search; overlaps, ..., but should be treated as set
-# here i need to parse == as issetequal
+# The shared integer, integer-set, and signed-discriminant builders use two passes:
+#   1. _normalize_condition wraps bare values in equality, validates operators and
+#      resolves aliases, and converts operands throughout the input And/Or tree.
+#   2. _build_condition maps each normalized Fix2 predicate to a Condition. A leaf
+#      can expand into several column predicates (set equality or signed values).
+# Normalization finishes first so an invalid branch is rejected even if another
+# branch makes the result constant. Operands remain Julia values until lowering.
 #
-# for class group structure
-# inpt: list{int}, backend type list{int}; allowed search: only == (not set theoretic, but as a list)
-# here i need to parse == as really equal? (need to check what they allow)
+# Other scalar transformations (__create_cond_trafo) and composite signatures have
+# their own builders, but produce the same Condition representation. Conditions.jl
+# translates it to FunSQL with create_fun; _create_where joins keyword conditions
+# with AND. No database connection is needed to normalize, build, or render a tree.
+#
+# When adding a parameter, declare every column it uses and choose a builder that
+# matches its semantics: integer sets ignore order and duplicates, while structured
+# arrays such as class groups retain them. Keep parameter-specific storage encoding
+# in the leaf builder.
 
-function _create_cond(v, k, origin, allowed)
-  if v isa Base.Fix2 && !(op.f in allowed)
-    error("only the following allowed for `$origin`: $(join(allowed, " "))")
+# Registry pairs map an accepted spelling to its canonical operator, e.g. == => issetequal.
+function _search_operator(op, origin, allowed)
+  for entry in allowed
+    if entry isa Pair
+      op === first(entry) && return last(entry)
+    elseif op === entry
+      return op
+    end
   end
-  create_cond(v, k)
+  throw(ArgumentError("only the following allowed for `$origin`: $(join(allowed, " "))"))
 end
 
+# normalize_operand(canonical_operator, value, origin) returns the converted
+# operand. It validates its shape; origin is the keyword name used in errors.
+function _normalize_condition(v::Base.Fix2, origin, allowed, normalize_operand)
+  op = _search_operator(v.f, origin, allowed)
+  return Base.Fix2(op, normalize_operand(op, v.x, origin))
+end
+
+function _normalize_condition(v::Union{And, Or}, origin, allowed, normalize_operand)
+  return typeof(v)(_normalize_condition(v.a, origin, allowed, normalize_operand),
+                   _normalize_condition(v.b, origin, allowed, normalize_operand))
+end
+
+_normalize_condition(v, origin, allowed, normalize_operand) =
+  _normalize_condition(==(v), origin, allowed, normalize_operand)
+
+# leaf_builder accepts a normalized Fix2 and returns a Condition on physical
+# columns. The input And/Or nodes become AndC/OrC through the Condition operators.
+_build_condition(leaf_builder, v::Base.Fix2) = leaf_builder(v)
+
+function _build_condition(leaf_builder, v::And)
+  return _build_condition(leaf_builder, v.a) & _build_condition(leaf_builder, v.b)
+end
+
+function _build_condition(leaf_builder, v::Or)
+  return _build_condition(leaf_builder, v.a) | _build_condition(leaf_builder, v.b)
+end
+
+# These leaves require BigInt operands. Discriminants are nonzero and stored as
+# sign and absolute value; comparisons reverse direction on the negative branch.
+# Build predicates on those columns directly rather than multiplying them in SQL.
 function _create_cond_signed_split(v::Base.Fix2{typeof(==)}, k, kabs, ksign)
   a = v.x
   @assert a isa BigInt
   return LMFDBLite.PredC(kabs, ==(abs(a))) & LMFDBLite.PredC(ksign, ==(sign(a)))
-end
-
-function _create_cond_signed_split(v::LMFDBLite.And, k, kabs, ksign)
-  LMFDBLite.AndC(_create_cond_signed_split(v.a, k, kabs, ksign),
-                 _create_cond_signed_split(v.b, k, kabs, ksign))
-end
-
-function _create_cond_signed_split(v::LMFDBLite.Or, k, kabs, ksign)
-  LMFDBLite.OrC(_create_cond_signed_split(v.a, k, kabs, ksign),
-                _create_cond_signed_split(v.b, k, kabs, ksign))
 end
 
 function _create_cond_signed_split(v::Base.Fix2{typeof(>=)}, k, kabs, ksign)
@@ -326,7 +363,7 @@ end
 
 # BigInt(x) is the conversion hook, including for types supplied by optional
 # packages (such as Oscar/Hecke's ZZRingElem), without requiring Integer subtyping.
-function _discriminant_bigint(x, origin)
+function _search_bigint(x, origin)
   try
     return BigInt(x)
   catch err
@@ -335,35 +372,58 @@ function _discriminant_bigint(x, origin)
   end
 end
 
-function _normalize_discriminant(v::Base.Fix2, origin, allowed)
-  v.f in allowed || throw(ArgumentError("only the following allowed for `$origin`: $(join(allowed, " "))"))
-  if v.f !== in
-    return Base.Fix2(v.f, _discriminant_bigint(v.x, origin))
+function _normalize_integer_operand(op, a, origin)
+  if op !== in
+    return _search_bigint(a, origin)
   end
-  a = v.x
   if a isa AbstractRange
-    stride = _discriminant_bigint(step(a), origin)
+    # Convert endpoints without iterating the range, before any sign arithmetic.
+    # Ascending BigInt unit ranges are rendered as BETWEEN by create_fun.
+    stride = _search_bigint(step(a), origin)
     abs(stride) == 1 || throw(ArgumentError("search parameter `$origin` supports only unit-step ranges; use an explicit vector for stepped membership"))
-    isempty(a) && return in(BigInt[])
-    lb = _discriminant_bigint(first(a), origin)
-    ub = _discriminant_bigint(last(a), origin)
-    return in(stride == 1 ? (lb:ub) : (ub:lb))
+    isempty(a) && return BigInt[]
+    lb = _search_bigint(first(a), origin)
+    ub = _search_bigint(last(a), origin)
+    return stride == 1 ? (lb:ub) : (ub:lb)
   elseif a isa AbstractVector
-    return in(BigInt[_discriminant_bigint(x, origin) for x in a])
+    return BigInt[_search_bigint(x, origin) for x in a]
   end
   throw(ArgumentError("search parameter `$origin` requires a vector or unit-step range for membership"))
 end
 
-function _normalize_discriminant(v::Union{And, Or}, origin, allowed)
-  return typeof(v)(_normalize_discriminant(v.a, origin, allowed),
-                   _normalize_discriminant(v.b, origin, allowed))
+function _normalize_integer_array_operand(op, a, origin)
+  if !(a isa AbstractVector) || a isa AbstractRange
+    throw(ArgumentError("search parameter `$origin` requires an explicit vector of values convertible to BigInt"))
+  end
+  return BigInt[_search_bigint(x, origin) for x in a]
 end
 
-_normalize_discriminant(v, origin, allowed) = _normalize_discriminant(==(v), origin, allowed)
+function _create_integer_cond(k, v, origin, allowed)
+  normalized = _normalize_condition(v, origin, allowed, _normalize_integer_operand)
+  return _build_condition(normalized) do op
+    op.f === in && isempty(op.x) ? FalseC() : create_cond(k, op)
+  end
+end
+
+function _create_integer_set_cond(k, v, origin, allowed)
+  normalized = _normalize_condition(v, origin, allowed, _normalize_integer_array_operand)
+  return _build_condition(normalized) do op
+    values = _vec_to_sql_array(op.x)
+    if op.f === issetequal
+      # Mutual containment implements set equality, including duplicate operands.
+      return create_cond(k, issuperset(values)) & create_cond(k, issubset(values))
+    end
+    # Retain containment even for []: inclusion is true for non-null arrays,
+    # while containment in [] (and set equality with []) selects empty arrays.
+    return create_cond(k, Base.Fix2(op.f, values))
+  end
+end
 
 function __create_cond_signed_split(v, k, kabs, ksign, origin, allowed::Vector)
-  normalized = _normalize_discriminant(v, origin, allowed)
-  return _create_cond_signed_split(normalized, k, kabs, ksign)
+  normalized = _normalize_condition(v, origin, allowed, _normalize_integer_operand)
+  return _build_condition(normalized) do op
+    _create_cond_signed_split(op, k, kabs, ksign)
+  end
 end
 
 function __create_cond_trafo(op::Base.Fix2, k, knew, trafo, origin, allowed::Vector)

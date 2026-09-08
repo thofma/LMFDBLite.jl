@@ -2,6 +2,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
     signed_bounds = (; label = in(["2.0.8.1", "2.0.7.1", "2.0.4.1", "2.0.3.1", "2.2.5.1", "2.2.8.1"]))
     signed_reference = LMFDBLite.search(conn, "nf_fields"; signed_bounds...)
     test_live_discriminants(conn, "nf_fields", signed_reference; signed_bounds...)
+    test_live_number_field_conditions(conn)
 
     @testset "Number field Galois group search" begin
         @testset "Equality: $filter" for filter in ("4T2", ==("4T2"))

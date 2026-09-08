@@ -27,6 +27,7 @@ end
 
 include("parameter_consistency.jl")
 include("discriminants.jl")
+include("number_field_conditions.jl")
 
 using Hecke
 
@@ -45,6 +46,9 @@ end
 # ZZRingElem is also Oscar's integer type; these tests need no database.
 test_discriminant_inputs(Hecke.ZZ)
 test_discriminant_ranges(Hecke.ZZ)
+test_number_field_conditions(Hecke.ZZ)
+test_number_field_integer_ranges(Hecke.ZZ)
+test_large_number_field_conditions(Hecke.ZZ)
 
 @testset "ZZRingElem discriminants beyond machine integers" begin
     value = big(2)^128 + 1

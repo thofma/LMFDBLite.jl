@@ -28,6 +28,15 @@ ranges. After Hecke loads, the same input tests also cover `ZZRingElem` values
 and ranges. Live tests compare filtered records with small reference sets of
 number fields and elliptic curves containing both signs of discriminant.
 
+The degree, ramified-prime count, and ramified-prime set tests cover their
+declared operators, nested validation, exact conversion, compact ranges, and
+set equality with reordered or repeated primes. They distinguish empty scalar
+membership from empty set inclusion and equality, and check that class-group
+equality retains its order. Inputs include `Int`, `Int32`, `BigInt`, a custom
+convertible type, and (after loading Hecke) `ZZRingElem`. Live tests compare
+against a small reference set that includes the rational field with no ramified
+primes.
+
 You can run the complete declaration check on an existing connection with
 `LMFDBLite.check_number_field_parameters(conn)`, or use
 `LMFDBLite.check_search_parameters(conn, table)` for any supported table.
