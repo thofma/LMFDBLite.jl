@@ -4,7 +4,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         for table in ("lat_lattices_new", "lat_genera")
             @test isnothing(LMFDBLite.check_search_parameters(conn, table))
             layout = LMFDBLite.table_layout(conn, table)
-            @testset "$table: $parameter" for (parameter, spec) in LMFDBLite._search_parameters(table)
+            @testset "$table: $parameter" for (parameter, spec) in LMFDBLite._search_parameter_definitions(table)
                 @test isnothing(LMFDBLite._check_parameter_schema(layout, table, parameter, spec))
             end
         end

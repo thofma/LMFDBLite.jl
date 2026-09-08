@@ -3,7 +3,7 @@ function test_elliptic_curves(conn::LMFDBLite.LMFDBConnection)
         table = "ec_curvedata"
         @test isnothing(LMFDBLite.check_search_parameters(conn, table))
         layout = LMFDBLite.table_layout(conn, table)
-        @testset "$parameter" for (parameter, spec) in LMFDBLite._elliptic_curve_parameters()
+        @testset "$parameter" for (parameter, spec) in LMFDBLite._elliptic_curve_parameter_definitions()
             @test isnothing(LMFDBLite._check_parameter_schema(layout, table, parameter, spec))
         end
 

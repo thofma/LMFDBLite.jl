@@ -22,11 +22,12 @@ These checks distinguish `class_group` (`jsonb`) from `narrow_class_group`
 (`bigint[]`) while requiring their Julia input types to agree.
 
 Signed-discriminant tests run without a database before the live tests. They
-exercise both table registries, recursive conditions, conversion through
-`BigInt(x)`, empty membership, integer extrema, and bounded SQL size for large
-ranges. After Hecke loads, the same input tests also cover `ZZRingElem` values
-and ranges. Live tests compare filtered records with small reference sets of
-number fields and elliptic curves containing both signs of discriminant.
+exercise the parameter definitions for both tables, recursive conditions,
+conversion through `BigInt(x)`, empty membership, integer extrema, and bounded SQL
+size for large ranges. After Hecke loads, the same input tests also cover
+`ZZRingElem` values and ranges. Live tests compare filtered records with small
+reference sets of number fields and elliptic curves containing both signs of
+discriminant.
 
 The degree, ramified-prime count, and ramified-prime set tests cover their
 declared operators, nested validation, exact conversion, compact ranges, and

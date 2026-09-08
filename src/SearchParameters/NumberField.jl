@@ -1,4 +1,4 @@
-function _number_field_parameters()
+function _number_field_parameter_definitions()
   # Entries declare (Julia input type, PostgreSQL type(s), column(s), builder, operators).
   return Dict(
     :label => (String, LMFDBLite.SQL.text, :label, (k, v, orig, allowed) -> __create_cond_trafo(v, k, k, identity, orig, allowed), Any[==, in]),

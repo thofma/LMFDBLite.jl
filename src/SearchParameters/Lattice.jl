@@ -1,6 +1,6 @@
-function _lattice_parameters()
-  parameters = _quadratic_parameters()
-  merge!(parameters, Dict(
+function _lattice_parameter_definitions()
+  parameter_definitions = _quadratic_parameter_definitions()
+  merge!(parameter_definitions, Dict(
     :genus_label => _scalar_parameter(String, SQL.text, :genus_label, Any[==, in]),
     :minimum => _scalar_parameter(BigInt, SQL.integer, :minimum),
     :automorphism_group_order => _scalar_parameter(BigInt, SQL.numeric, :aut_size),
@@ -11,5 +11,5 @@ function _lattice_parameters()
     :kissing_number => _scalar_parameter(BigInt, SQL.bigint, :kissing),
     :festi_veniani_index => _scalar_parameter(BigInt, SQL.numeric, :festi_veniani_index),
   ))
-  return parameters
+  return parameter_definitions
 end

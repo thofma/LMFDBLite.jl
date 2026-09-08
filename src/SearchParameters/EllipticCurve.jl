@@ -1,5 +1,5 @@
-function _elliptic_curve_parameters()
-  parameters = Dict(
+function _elliptic_curve_parameter_definitions()
+  parameter_definitions = Dict(
     :label => _scalar_parameter(String, SQL.text, :lmfdb_label, Any[==, in]),
     :cremona_label => _scalar_parameter(String, SQL.text, :Clabel, Any[==, in]),
     :isogeny_class => _scalar_parameter(String, SQL.text, :lmfdb_iso, Any[==, in]),
@@ -44,7 +44,7 @@ function _elliptic_curve_parameters()
     :szpiro_ratio => _scalar_parameter(Float64, SQL.double, :szpiro_ratio),
     :intrinsic_torsion => _scalar_parameter(BigInt, SQL.smallint, :intrinsic_torsion),
   )
-  parameters[:ainvs] = parameters[:a_invariants]
-  parameters[:jinv] = parameters[:j_invariant]
-  return parameters
+  parameter_definitions[:ainvs] = parameter_definitions[:a_invariants]
+  parameter_definitions[:jinv] = parameter_definitions[:j_invariant]
+  return parameter_definitions
 end

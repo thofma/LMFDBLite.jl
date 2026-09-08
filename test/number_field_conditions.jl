@@ -1,7 +1,7 @@
 import FunSQL
 
 function number_field_condition(parameter, value)
-    spec = LMFDBLite._number_field_parameters()[parameter]
+    spec = LMFDBLite._number_field_parameter_definitions()[parameter]
     _, _, column, builder, allowed = spec
     condition = builder(column, value, parameter, allowed)
     columns, _ = LMFDBLite._parameter_columns_and_types(spec)
@@ -10,7 +10,7 @@ function number_field_condition(parameter, value)
 end
 
 function number_field_condition_sql(parameter, condition)
-    columns, _ = LMFDBLite._parameter_columns_and_types(LMFDBLite._number_field_parameters()[parameter])
+    columns, _ = LMFDBLite._parameter_columns_and_types(LMFDBLite._number_field_parameter_definitions()[parameter])
     query = FunSQL.From(FunSQL.SQLTable(:nf_fields; columns = collect(columns))) |>
             LMFDBLite._create_where([condition])
     return string(FunSQL.render(query; dialect = :postgresql))
@@ -124,7 +124,7 @@ function test_large_number_field_conditions(convert_value)
     end
 end
 
-@testset "Number field registry conditions without a database" begin
+@testset "Number field parameter definitions without a database" begin
     for T in (Int, Int32, BigInt, ConvertibleDiscriminant)
         test_number_field_conditions(T)
     end
@@ -178,7 +178,7 @@ end
 end
 
 function test_live_number_field_conditions(conn)
-    @testset "Number field registry conditions against live records" begin
+    @testset "Number field parameter definitions against live records" begin
         selected = ["1.1.1.1", "2.0.4.1", "2.0.3.1", "2.2.12.1", "2.2.5.1"]
         bounds = (; label = in(selected))
         reference = LMFDBLite.search(conn, "nf_fields"; bounds...)

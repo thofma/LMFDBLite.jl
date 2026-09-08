@@ -1,9 +1,9 @@
 @testset "Parameter consistency checks without a database" begin
     SQL = LMFDBLite.SQL
-    parameters = LMFDBLite._number_field_parameters()
-    spec = parameters[:narrow_class_group]
+    parameter_definitions = LMFDBLite._number_field_parameter_definitions()
+    spec = parameter_definitions[:narrow_class_group]
     # The user-facing types agree even though the PostgreSQL representations differ.
-    @test parameters[:class_group][1] === spec[1] === Vector{BigInt}
+    @test parameter_definitions[:class_group][1] === spec[1] === Vector{BigInt}
 
     layout = Dict{SQL.FieldName, SQL.ValueType}(
         SQL.FieldName(:narrow_class_group) => SQL.list{SQL.bigint}())
@@ -31,11 +31,11 @@
              (:discriminant, (:disc_abs, :disc_sign), (SQL.numeric, SQL.smallint))]
         layout = Dict{SQL.FieldName, SQL.ValueType}(
             SQL.FieldName(column) => T() for (column, T) in zip(columns, types))
-        @test isnothing(LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameters[parameter]))
+        @test isnothing(LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameter_definitions[parameter]))
         delete!(layout, SQL.FieldName(columns[2]))
-        @test_throws ErrorException LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameters[parameter])
+        @test_throws ErrorException LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameter_definitions[parameter])
         layout[SQL.FieldName(columns[2])] = SQL.text()
-        @test_throws ErrorException LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameters[parameter])
+        @test_throws ErrorException LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, parameter_definitions[parameter])
     end
 
     @testset "Malformed declarations" begin
@@ -60,7 +60,7 @@ function test_number_field_parameter_consistency(conn::LMFDBLite.LMFDBConnection
     @testset "Number field parameter declarations match PostgreSQL" begin
         @test isnothing(LMFDBLite.check_number_field_parameters(conn))
         layout = LMFDBLite.table_layout(conn, "nf_fields")
-        @testset "$parameter" for (parameter, spec) in LMFDBLite._number_field_parameters()
+        @testset "$parameter" for (parameter, spec) in LMFDBLite._number_field_parameter_definitions()
             @test isnothing(LMFDBLite._check_parameter_schema(layout, "nf_fields", parameter, spec))
         end
 

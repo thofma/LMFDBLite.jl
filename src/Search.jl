@@ -157,15 +157,15 @@ function _check_parameter_schema(layout, tname, parameter, spec)
   return nothing
 end
 
-function _search_parameters(tname::String)
+function _search_parameter_definitions(tname::String)
   if tname == "nf_fields"
-    return _number_field_parameters()
+    return _number_field_parameter_definitions()
   elseif tname == "lat_lattices_new"
-    return _lattice_parameters()
+    return _lattice_parameter_definitions()
   elseif tname == "lat_genera"
-    return _genus_parameters()
+    return _genus_parameter_definitions()
   elseif tname == "ec_curvedata"
-    return _elliptic_curve_parameters()
+    return _elliptic_curve_parameter_definitions()
   end
   throw(ArgumentError("search has no parameter definitions for table `$tname`"))
 end
@@ -179,7 +179,7 @@ parameter, column, and expected type on a mismatch. No additional queries are ma
 """
 function check_search_parameters(conn::LMFDBConnection, tname::String)
   layout = table_layout(conn, tname)
-  for (parameter, spec) in _search_parameters(tname)
+  for (parameter, spec) in _search_parameter_definitions(tname)
     _check_parameter_schema(layout, tname, parameter, spec)
   end
   return nothing
@@ -194,11 +194,11 @@ check_number_field_parameters(conn::LMFDBConnection) = check_search_parameters(c
 
 function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
   layout = table_layout(conn, tname)
-  parameters = _search_parameters(tname)
+  parameter_definitions = _search_parameter_definitions(tname)
   conds = Condition[]
   for (parameter, value) in kw
-    haskey(parameters, parameter) || throw(ArgumentError("unknown search parameter `$parameter` for table `$tname`"))
-    spec = parameters[parameter]
+    haskey(parameter_definitions, parameter) || throw(ArgumentError("unknown search parameter `$parameter` for table `$tname`"))
+    spec = parameter_definitions[parameter]
     _check_parameter_schema(layout, tname, parameter, spec)
     _, _, column, builder, allowed = spec
     # Builders receive physical column(s), the user value, its public parameter
@@ -219,7 +219,7 @@ end
     search(conn, table; limit = Inf, kw...)
 
 Search `nf_fields`, `ec_curvedata`, `lat_lattices_new`, or `lat_genera` using
-their parameter registry. Return a vector of database records. Validate the
+their parameter definitions. Return a vector of database records. Validate the
 columns and types against cached connection metadata before issuing the query.
 """
 function search(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
@@ -243,9 +243,9 @@ end
 #
 ################################################################################
 
-# Pipeline: keyword value -> registry builder -> Condition tree -> FunSQL -> SQL.
+# Pipeline: keyword value -> parameter builder -> Condition tree -> FunSQL -> SQL.
 #
-# Each registry entry declares an input type, SQL type(s), physical column(s),
+# Each parameter definition declares an input type, SQL type(s), physical column(s),
 # builder, and allowed operators. _search_query checks the cached schema before
 # calling the builder, then verifies that its Condition uses only declared columns.
 # The declared input type describes the parameter; the builder performs conversion.
@@ -268,7 +268,8 @@ end
 # arrays such as class groups retain them. Keep parameter-specific storage encoding
 # in the leaf builder.
 
-# Registry pairs map an accepted spelling to its canonical operator, e.g. == => issetequal.
+# Operator pairs in a parameter definition map an accepted spelling to its canonical
+# operator, e.g. == => issetequal.
 function _search_operator(op, origin, allowed)
   for entry in allowed
     if entry isa Pair

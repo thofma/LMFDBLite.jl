@@ -1,7 +1,7 @@
 import FunSQL
 
 function discriminant_condition(table, value)
-    _, _, columns, builder, allowed = LMFDBLite._search_parameters(table)[:discriminant]
+    _, _, columns, builder, allowed = LMFDBLite._search_parameter_definitions(table)[:discriminant]
     condition = builder(columns, value, :discriminant, allowed)
     LMFDBLite._assert_parameter_columns(condition, columns, :discriminant)
     return condition

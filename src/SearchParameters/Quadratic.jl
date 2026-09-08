@@ -1,8 +1,9 @@
-# Common search parameters for quadratic lattices and their genera. These do not
-# describe a separate searchable table; `_lattice_parameters` and
-# `_genus_parameters` extend this shared registry with type-specific parameters.
-function _quadratic_parameters()
-  parameters = Dict(
+# Common search parameter definitions for quadratic lattices and their genera.
+# These do not describe a separate searchable table.
+# `_lattice_parameter_definitions` and `_genus_parameter_definitions` extend
+# them with parameters for their tables.
+function _quadratic_parameter_definitions()
+  parameter_definitions = Dict(
     :label => _scalar_parameter(String, SQL.text, :label, Any[==, in]),
     :rank => _scalar_parameter(BigInt, SQL.smallint, :rank),
     :signature => (Tuple{BigInt, BigInt}, (SQL.smallint, SQL.smallint), (:rank, :nplus), _create_lattice_signature_cond, Any[==]),
@@ -17,7 +18,7 @@ function _quadratic_parameters()
     :dual_conway_symbol => _scalar_parameter(String, SQL.text, :dual_conway_symbol, Any[==, in]),
     :scale => _scalar_parameter(BigInt, SQL.integer, :scale),
   )
-  parameters[:disc] = parameters[:discriminant]
-  parameters[:discriminant_group_invs] = parameters[:disc_group_invs]
-  return parameters
+  parameter_definitions[:disc] = parameter_definitions[:discriminant]
+  parameter_definitions[:discriminant_group_invs] = parameter_definitions[:disc_group_invs]
+  return parameter_definitions
 end
