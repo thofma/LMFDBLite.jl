@@ -415,6 +415,8 @@ function _normalize_integer_operand(op, a, origin)
   if a isa AbstractRange
     # Convert endpoints without iterating the range, before any sign arithmetic.
     # Ascending BigInt unit ranges are rendered as BETWEEN by create_fun.
+    # Every scalar integer parameter uses this policy: other steps are rejected,
+    # even for empty or singleton ranges. Explicit vectors retain discrete membership.
     stride = _search_bigint(step(a), origin)
     abs(stride) == 1 || throw(ArgumentError("search parameter `$origin` supports only unit-step ranges; use an explicit vector for stepped membership"))
     isempty(a) && return BigInt[]
@@ -487,10 +489,6 @@ end
 function _create_cond_trafo(op::Base.Fix2, k, knew, trafo)
   if op.f === in
     @assert op.x isa AbstractVector
-    # Keep integer intervals compact: BigInt unit ranges become SQL BETWEEN.
-    if trafo === BigInt && op.x isa AbstractUnitRange{<:Integer}
-      return create_cond(knew, in(BigInt(first(op.x)):BigInt(last(op.x))))
-    end
     return create_cond(knew, op.f(trafo.(op.x)))
   else
     return create_cond(knew, op.f(trafo(op.x)))
@@ -527,6 +525,9 @@ function _create_lattice_signature_cond(columns, v, origin, allowed)
 end
 
 function _scalar_parameter(T, sqltype, column, allowed = Any[==, <=, >=, >, <, in]; transform = T)
-  builder = (k, v, origin, ops) -> __create_cond_trafo(v, k, k, transform, origin, ops)
+  # Integer conversion must inspect range endpoints and step before any broadcast.
+  # This also handles Hecke/Oscar ranges whose elements are not subtypes of Integer.
+  builder = transform === BigInt ? _create_integer_cond :
+            (k, v, origin, ops) -> __create_cond_trafo(v, k, k, transform, origin, ops)
   return (T, sqltype, column, builder, allowed)
 end

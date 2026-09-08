@@ -12,13 +12,18 @@ Parameters include `label`, `rank`, `signature`, `level`, `class_number`,
 `mass`, `conway_symbol`, `dual_conway_symbol`, and `scale`.
 
 Signatures are `(nplus, nminus)`. Integer parameters support comparisons and
-vector/range membership; labels support equality and vector membership.
+vector or unit-step range membership; labels support equality and vector
+membership.
 Combine conditions for one parameter with `allof` (AND) and `anyof` (OR),
 including signatures, e.g. `signature = anyof((2, 0), (1, 1))`.
 Boolean and vector parameters support equality. `mass` supports exact rational
 equality, e.g. `mass = 1//2`. Gram matrices are flattened integer vectors.
 The database column names `nplus`, `disc`, `det`, `rep`, and
 `discriminant_group_invs` are also supported.
+
+Integer ranges with step `1` or `-1` stay compact, including Oscar/Hecke ranges.
+Other steps now raise `ArgumentError`; use an explicit vector such as
+`in([1, 3, 5])` or `in(collect(1:2:5))` for discrete membership.
 
 Use `LMFDBLite.search(conn, "lat_genera"; kw...)` for raw records.
 """

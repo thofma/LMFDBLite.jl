@@ -15,7 +15,8 @@ Supported parameters include:
   Use `anyof((2, 0), (0, 1))` to accept either of two signatures.
 - `class_number`, `narrow_class_number`, `relative_class_number`, `index`:
   an integer, a comparison (`==`, `<`, `<=`, `>`, `>=`), or `in` with an
-  integer vector or range. Combine bounds with `allof`, e.g. `allof(>=(2), <=(10))`.
+  integer vector or a range with step `1` or `-1`.
+  Combine bounds with `allof`, e.g. `allof(>=(2), <=(10))`.
 - `class_group`, `narrow_class_group`: a vector of invariant factors in
   increasing divisibility order, optionally wrapped in `==`. Use `Int[]`
   for the trivial group.
@@ -28,6 +29,10 @@ Supported parameters include:
 
 Conditions for one parameter can be combined with `allof` (AND) and `anyof` (OR),
 including nested combinations. Each branch must use a supported operator and value.
+
+Scalar integer ranges with step `1` or `-1` stay compact, including Oscar/Hecke
+ranges. Other steps now raise `ArgumentError` instead of being expanded implicitly;
+replace `in(1:2:9)` with `in([1, 3, 5, 7, 9])` or `in(collect(1:2:9))`.
 
 For example, search for real quadratic fields with class number one but
 narrow class number two:

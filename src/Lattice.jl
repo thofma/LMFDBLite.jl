@@ -20,13 +20,17 @@ Parameters include `label`, `genus_label`, `rank`, `signature`, `level`,
 
 A signature `(nplus, nminus)` constrains both the rank and the positive index.
 Use `anyof((2, 0), (1, 1))` to accept either of two signatures.
-Integer parameters accept comparisons, vector/range membership, and combined
-bounds with `allof`. Conditions for one parameter can be nested using `allof`
+Integer parameters accept comparisons, vector or unit-step range membership,
+and combined bounds with `allof`. Conditions for one parameter can be nested using `allof`
 (AND) and `anyof` (OR). Labels accept equality and vector membership. Boolean
 parameters accept equality. Gram matrices are flattened integer vectors, and group invariants
 are integer vectors; both accept equality. `dual_determinant` uses `Float64` inputs
 and compares stored numerical values. The database column names `nplus`, `disc`,
 and `discriminant_group_invs` are also supported.
+
+Integer ranges with step `1` or `-1` stay compact, including Oscar/Hecke ranges.
+Other steps now raise `ArgumentError`; use an explicit vector such as
+`in([1, 3, 5])` or `in(collect(1:2:5))` for discrete membership.
 
 Use `LMFDBLite.search(conn, "lat_lattices_new"; kw...)` for raw records.
 """

@@ -180,7 +180,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
             cases = [
                 (1, ==(1)), (==(2), ==(2)), (<(2), <(2)), (<=(2), <=(2)),
                 (>(2), >(2)), (>=(2), >=(2)), (in([1, 3]), in([1, 3])),
-                (in(1:2), in(1:2)), (in(1:2:5), in(1:2:5)),
+                (in(1:2), in(1:2)), (in(collect(1:2:5)), in(1:2:5)),
                 (in(2:1), _ -> false), (in(Int[]), _ -> false),
                 (in(big(1):big(10)^30), >=(1)),
                 (allof(>=(2), <=(3)), x -> 2 <= x <= 3),
@@ -194,8 +194,9 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 end
                 @test labels(rows) == labels(expected)
             end
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 parameter => LMFDBLite.includes([1]), limit = 1)
+            test_live_integer_ranges(conn, "nf_fields", parameter, parameter, reference)
         end
 
         @testset "Narrow class group" begin

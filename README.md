@@ -49,8 +49,9 @@ error.
 - Scalar numeric parameters accept a bare value or `==(value)` for equality,
   and the comparisons `<(value)`, `<=(value)`, `>(value)`, and `>=(value)`.
   For example, `degree = ==(4)` and `degree = >=(4)`.
-- Use `in([values...])` to match any value in a list. Integer parameters also
-  accept an inclusive unit range, such as `conductor = in(11:100)`.
+- Use `in([values...])` to match any value in a list. Scalar integer parameters
+  also accept inclusive ranges with step `1` or `-1`, such as
+  `conductor = in(11:100)`, `in(11:1:100)`, or `in(100:-1:11)`.
 - Combine conditions for one parameter with `allof` (logical and) or `anyof`
   (logical or), for example `class_number = allof(>=(2), <=(10))` or
   `class_number = anyof(==(1), ==(2))`. Both accept three or more conditions and
@@ -83,14 +84,33 @@ The existing `&(Function, Function)` overload remains available for combining tw
 predicates. Use `allof` and `anyof` for longer or mixed combinations; direct `|`
 between predicates and chains of `&` are not supported.
 
-Signed `discriminant` searches for number fields and elliptic curves, and number
-field `degree`, `ramified_prime_count`, and `ramified` searches, convert operands
-using `BigInt(x)`. This includes values inside comparisons and vectors, and
-supports Oscar/Hecke integers (`ZZRingElem`). For scalar membership, unit-step
-ranges in either direction are kept compact; use an explicit vector for other
-steps. Empty scalar membership matches no records. `ramified` operands must be
-explicit vectors. Unsupported operators and invalid operands for these
-parameters raise `ArgumentError`, also inside combined conditions.
+All scalar integer parameters, including signed discriminants, and the
+number-field `ramified` parameter convert operands using `BigInt(x)`. This
+includes values inside comparisons and vectors, and supports Oscar/Hecke
+integers (`ZZRingElem`). Integer membership ranges with step `1` or `-1` are
+handled using their endpoints, without expanding their elements. This applies
+to `Int`, `BigInt`, and Oscar/Hecke ranges on all four tables. Empty unit-step
+ranges and empty membership vectors match no records. `ramified` operands must
+be explicit vectors. Unsupported operators and invalid operands for these
+parameters consistently raise `ArgumentError`, also inside combined conditions.
+
+**Compatibility change for stepped integer ranges:** some parameters previously
+accepted ranges such as `class_number = in(1:2:9)` by expanding them into lists.
+All scalar integer parameters now reject ranges whose step is neither `1` nor
+`-1` with `ArgumentError`, including empty and singleton ranges. This prevents
+implicit expansion of large ranges and applies inside `allof` and `anyof` too.
+To request discrete values, supply an explicit vector:
+
+```julia
+# Previously accepted; now raises ArgumentError:
+LMFDBLite.search(conn, "nf_fields"; class_number = in(1:2:9))
+
+# Explicit replacements with the same discrete membership:
+LMFDBLite.search(conn, "nf_fields"; class_number = in([1, 3, 5, 7, 9]))
+LMFDBLite.search(conn, "nf_fields"; class_number = in(collect(1:2:9)))
+```
+
+An explicit vector matches only its listed values; the gaps are not filled in.
 
 ## Hecke and Oscar integration
 

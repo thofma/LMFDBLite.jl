@@ -46,6 +46,16 @@ integer, discriminant, and ramification tests also use this syntax, including
 `ZZRingElem` inputs after Hecke loads. Live tests compare composed signature
 queries with independently filtered number-field, lattice, and genus records.
 
+Integer range tests cover every scalar integer parameter on all four tables,
+including aliases, signed discriminants, and Oscar/Hecke ranges. Ascending,
+explicit-step, and descending unit ranges must produce the same bounded SQL.
+Small reference sets check empty ranges and discrete vector membership. Ranges
+with any other step must raise `ArgumentError`, even when empty, singleton, or
+nested inside a condition. This replaces the previous implicit expansion of
+stepped ranges on some parameters; the tests check the documented migration
+from `in(1:2:9)` to `in([1, 3, 5, 7, 9])` or `in(collect(1:2:9))`.
+Live tests compare unit-range filters with independently filtered records.
+
 You can run the complete declaration check on an existing connection with
 `LMFDBLite.check_number_field_parameters(conn)`, or use
 `LMFDBLite.check_search_parameters(conn, table)` for any supported table.

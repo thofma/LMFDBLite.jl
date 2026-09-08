@@ -15,6 +15,7 @@ function test_elliptic_curves(conn::LMFDBLite.LMFDBConnection)
         signed_bounds = (; conductor = in([11, 37]))
         signed_reference = LMFDBLite.search(conn, table; signed_bounds...)
         test_live_discriminants(conn, table, signed_reference; signed_bounds...)
+        test_live_integer_ranges(conn, table, :rank, :rank, signed_reference)
 
         labels(rows) = Set(r.lmfdb_label for r in rows)
         @test labels(LMFDBLite.search(conn, table; isogeny_class = "11.a")) == labels(reference)

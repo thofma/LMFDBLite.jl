@@ -156,7 +156,7 @@ end
                                    ("lat_lattices_new", :rank), ("lat_genera", :rank))
             for criterion in (allof(in(Int[]), includes([2])),
                               anyof(==(2), allof(>(0), includes([2]))))
-                @test_throws ErrorException composition_condition(table, parameter, criterion)
+                @test_throws ArgumentError composition_condition(table, parameter, criterion)
             end
         end
     end

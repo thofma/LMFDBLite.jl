@@ -111,7 +111,7 @@ end
 
     @testset "Compact ranges and integer extrema" begin
         for table in ("nf_fields", "ec_curvedata")
-            ranges = (-10^9:10^9, big(-10)^30:big(10)^30,
+            ranges = (-10^9:10^9, -(big(10)^30):big(10)^30,
                       typemin(Int):typemax(Int), typemin(Int):(typemin(Int) + 2),
                       (typemax(Int) - 2):typemax(Int), -8:1:8, 8:-1:-8)
             for r in ranges
