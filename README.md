@@ -18,9 +18,18 @@ records = LMFDBLite.search(conn, "nf_fields";
 
 The call `lmfdb()` constructs the default `LMFDBConnection` on its first call and
 returns that cached connection on subsequent calls. Construct
-`LMFDBConnection(; host, port, dbname, user, password)` directly when a custom,
-independently managed connection is needed. Call `reset!(conn)` to reset the
+`LMFDBConnection(; host, port, dbname, user, password, schema = "public")` directly
+when a custom, independently managed connection is needed. Call `reset!(conn)` to reset the
 connection to the [LMFDB](https://www.lmfdb.org/).
+
+The connection reflects tables in the selected schema and uses that same schema
+for searches and column metadata, independently of PostgreSQL's `search_path`.
+It loads and caches a table's column types on first use, so unsupported types in
+unrelated tables do not prevent connecting or searching supported tables.
+Search parameter validation still reports missing columns and incorrect types.
+Requesting a layout containing an unsupported type raises an error for that
+table. Open a new connection after a schema change to refresh reflected tables
+and cached layouts; `reset!` only resets communication with the server.
 
 The function `search` returns a vector of named tuples.
 

@@ -20,7 +20,7 @@ function get_type(name::String)
   elseif name == "regproc"
     return SQL.regproc()
   elseif name == "character"
-    return SQL.regproc()
+    return SQL.character()
   elseif name == "oid"
     return SQL.oid()
   elseif name == "name"
@@ -30,7 +30,7 @@ function get_type(name::String)
   elseif name == "int2vector"
     return SQL.int2vector()
   elseif name == "oidvector"
-    return SQL.int2vector()
+    return SQL.oidvector()
   elseif name == "pg_lsn"
     return SQL.pg_lsn()
   elseif name == "bytea"
@@ -74,4 +74,28 @@ function SQL.TableLayout(v::Vector)
     D[SQL.FieldName(Symbol(entry.column_name))] = get_type(entry.regtype)
   end
   return SQL.TableLayout(D)
+end
+
+function query_table_layout(conn::LMFDBConnection, tname::String)
+  # Match the schema-qualified table reflected by FunSQL. Looking up types by
+  # OID avoids resolving unqualified type names through the session search_path.
+  # Omit type modifiers: e.g. numeric(20, 0) still has the SQL type numeric.
+  # Only the requested table is converted, so unknown types elsewhere cannot
+  # prevent a connection or a search on a supported table.
+  q = raw"""
+      SELECT a.attname AS column_name,
+             pg_catalog.format_type(a.atttypid, NULL) AS regtype
+      FROM pg_catalog.pg_namespace AS n
+      JOIN pg_catalog.pg_class AS c ON c.relnamespace = n.oid
+      JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid
+      WHERE n.nspname = $1 AND c.relname = $2
+        AND a.attnum > 0 AND NOT a.attisdropped
+      ORDER BY a.attnum
+      """
+  result = DBInterface.execute(conn.conn.raw, q, [conn.schema, tname])
+  try
+    return SQL.TableLayout(rowtable(result))
+  finally
+    close(result)
+  end
 end

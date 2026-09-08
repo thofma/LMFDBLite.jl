@@ -1,4 +1,4 @@
-These tests make read-only queries against the live LMFDB PostgreSQL database
+The default suite makes read-only queries against the live LMFDB PostgreSQL database
 used by `LMFDBLite.lmfdb()` (`devmirror.lmfdb.xyz:5432` by default).
 They require network access; connection failures fail the test run.
 
@@ -60,8 +60,10 @@ You can run the complete declaration check on an existing connection with
 `LMFDBLite.check_number_field_parameters(conn)`, or use
 `LMFDBLite.check_search_parameters(conn, table)` for any supported table.
 Each `search` call checks
-the parameters it uses before issuing the query. The checks use metadata cached
-when the connection was opened, so reconnect to check a changed database schema.
+the parameters it uses before issuing the query. The checks fetch a table's
+metadata on first use and cache it for the lifetime of the connection, so
+reconnect to check a changed database schema. Live tests also check that layouts
+start unloaded and are reused after the first request.
 
 Run from the package directory:
 
@@ -70,7 +72,24 @@ julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
 To use another LMFDB database, set any of `LMFDB_HOST`, `LMFDB_PORT`,
-`LMFDB_DBNAME`, `LMFDB_USER`, and `LMFDB_PASSWORD` before running the tests.
+`LMFDB_DBNAME`, `LMFDB_USER`, `LMFDB_PASSWORD`, and `LMFDB_SCHEMA` before running the tests.
+
+The metadata regression fixture creates a private temporary PostgreSQL cluster
+and tests unrelated unsupported types, same-named tables in different schemas,
+an overridden `search_path`, quoted schema names, lazy caching, type mappings,
+and missing/mistyped search columns. It listens only on a Unix socket in its
+temporary directory and shuts down and removes the cluster afterwards. It does
+not use or modify the public mirror or the database selected by `LMFDB_*`.
+
+To include this fixture in the full suite, set `LMFDB_POSTGRES_BIN` to a directory
+containing PostgreSQL's `initdb` and `pg_ctl`. You can also run it independently:
+
+```sh
+LMFDB_POSTGRES_BIN=/path/to/postgresql/bin julia --project=. test/metadata_postgresql.jl
+```
+
+Without this setting, the fixture is not run; the type mapping and live metadata
+checks still run as part of the normal suite.
 
 Root discriminant tests cover scalar values, comparisons, list membership, and
 combined bounds. Equality and membership compare the stored floating-point `rd`

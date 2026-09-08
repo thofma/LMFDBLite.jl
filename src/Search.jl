@@ -152,20 +152,32 @@ end
 
 function check_table_name(conn::LMFDBConnection, tname::String)
   if !(tname in conn.table_names)
-    throw(ArgumentError("Table with name $(tname) does not exist; see `tables_names`"))
+    throw(ArgumentError("Table with name $(tname) does not exist in schema $(conn.schema); see `table_names`"))
   end
 end
 
 function check_table_column_name(conn::LMFDBConnection, tname::String, column::Symbol)
-  layout = conn.table_layouts[tname].data # Dict{FieldName, SQL.ValueType}
+  layout = table_layout(conn, tname)
   if !(LMFDBLite.SQL.FieldName(column) in keys(layout))
     throw(ArgumentError("Table $(tname) does not have a column named \"$(column)\". See `table_layout`."))
   end
 end
 
+"""
+    table_layout(conn, table)
+
+Return the column types of `table` in `conn.schema`. Load metadata on first use
+and cache it for the lifetime of the connection. An unsupported column type
+raises an error only when that table's layout is requested.
+"""
 function table_layout(conn::LMFDBConnection, tname::String)
   check_table_name(conn, tname)
-  return conn.table_layouts[tname].data
+  return lock(conn.table_layout_lock) do
+    layout = get!(conn.table_layouts, (conn.schema, tname)) do
+      query_table_layout(conn, tname)
+    end
+    return layout.data
+  end
 end
 
 # A parameter can map to one column or to a tuple of columns (e.g. signature).
@@ -208,13 +220,15 @@ end
 """
     check_search_parameters(conn, table)
 
-Check all parameter declarations for `table` against the PostgreSQL metadata
-collected when `conn` was opened. Return `nothing` on success, or report the
-parameter, column, and expected type on a mismatch. No additional queries are made.
+Check all parameter declarations for `table` against its PostgreSQL metadata in
+`conn.schema`. Fetch and cache that table's layout on first use; later calls reuse
+it. Return `nothing` on success, or report the parameter, column, and expected
+type on a mismatch. Open a new connection to check a changed database schema.
 """
 function check_search_parameters(conn::LMFDBConnection, tname::String)
+  parameter_definitions = _search_parameter_definitions(tname)
   layout = table_layout(conn, tname)
-  for (parameter, spec) in _search_parameter_definitions(tname)
+  for (parameter, spec) in parameter_definitions
     _check_parameter_schema(layout, tname, parameter, spec)
   end
   return nothing
@@ -228,8 +242,8 @@ Check all number field declarations using `check_search_parameters(conn, "nf_fie
 check_number_field_parameters(conn::LMFDBConnection) = check_search_parameters(conn, "nf_fields")
 
 function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
-  layout = table_layout(conn, tname)
   parameter_definitions = _search_parameter_definitions(tname)
+  layout = table_layout(conn, tname)
   conds = Condition[]
   for (parameter, value) in kw
     haskey(parameter_definitions, parameter) || throw(ArgumentError("unknown search parameter `$parameter` for table `$tname`"))
@@ -255,7 +269,8 @@ end
 
 Search `nf_fields`, `ec_curvedata`, `lat_lattices_new`, or `lat_genera` using
 their parameter definitions. Return a vector of database records. Validate the
-columns and types against cached connection metadata before issuing the query.
+columns and types against the table's cached metadata before issuing the query,
+loading the layout on first use. Tables are resolved in `conn.schema`.
 """
 function search(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
   return rowtable(DBInterface.execute(conn.conn, _search_query(conn, tname; limit, kw...)))

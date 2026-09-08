@@ -85,22 +85,30 @@ abstract type Condition end
 ################################################################################
 
 """
-    LMFDBConnection(; host, port, dbname, user, password)
+    LMFDBConnection(; host, port, dbname, user, password, schema = "public")
 
 Open an independently managed connection to an LMFDB PostgreSQL database.
+Reflect tables in `schema` and use that schema for searches and column metadata,
+independently of PostgreSQL's `search_path`. Typed table layouts are loaded and
+cached on first use; unrelated tables do not need supported column types.
+Open a new connection to refresh reflected tables and cached layouts after a
+schema change. `reset!` only resets communication with the server.
 Use `lmfdb()` for the lazily constructed, cached default connection.
 """
 struct LMFDBConnection
   conn::FunSQL.SQLConnection{LibPQ.DBConnection}
   env#= properties of the connection =#
+  schema::String
   table_names::Vector{String}
-  table_layouts::Dict{String, SQL.TableLayout}
+  table_layouts::Dict{Tuple{String, String}, SQL.TableLayout}
+  table_layout_lock::ReentrantLock
 
   function LMFDBConnection(; host = "devmirror.lmfdb.xyz",
                    port = "5432",
                    dbname = "lmfdb",
                    user = "lmfdb",
-                   password = "lmfdb")
+                   password = "lmfdb",
+                   schema::AbstractString = "public")
     raw = DBInterface.connect(LibPQ.Connection,
                                    """
                                    host=$host
@@ -111,10 +119,14 @@ struct LMFDBConnection
                                    """)
     try
       # FunSQL cannot infer the dialect from LibPQ's DBInterface adapter type.
-      catalog = FunSQL.reflect(raw; dialect = :postgresql)
+      catalog = FunSQL.reflect(raw; schema, dialect = :postgresql)
       conn = FunSQL.SQLConnection(raw; catalog)
-      tnames, tlayouts = query_meta_data(conn)
-      return new(conn, (;host, port, dbname, user, password), tnames, tlayouts)
+      # Reflection records names and qualified SQL tables without interpreting
+      # column types. Use this same catalog for table discovery and searches.
+      tnames = sort!(String.(collect(keys(catalog))))
+      tlayouts = Dict{Tuple{String, String}, SQL.TableLayout}()
+      return new(conn, (;host, port, dbname, user, password), String(schema),
+                 tnames, tlayouts, ReentrantLock())
     catch
       DBInterface.close!(raw)
       rethrow()

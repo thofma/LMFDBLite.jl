@@ -28,6 +28,10 @@ using Test
 end
 
 include("parameter_consistency.jl")
+include("metadata.jl")
+if haskey(ENV, "LMFDB_POSTGRES_BIN")
+    include("metadata_postgresql.jl")
+end
 include("discriminants.jl")
 include("number_field_conditions.jl")
 include("composition.jl")
@@ -71,7 +75,7 @@ end
 
 # Use the package's default public database, with optional connection overrides.
 connection_options = Dict{Symbol, String}()
-for key in (:host, :port, :dbname, :user, :password)
+for key in (:host, :port, :dbname, :user, :password, :schema)
     env_key = "LMFDB_" * uppercase(string(key))
     if haskey(ENV, env_key)
         connection_options[key] = ENV[env_key]
@@ -81,6 +85,7 @@ end
 @testset "LMFDB live database tests" begin
     conn = LMFDBLite.LMFDBConnection(; connection_options...)
     try
+        test_lazy_metadata(conn)
         @test reset!(conn) === nothing
         @test isopen(conn)
         @test sprint(show, conn) ==

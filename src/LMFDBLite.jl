@@ -90,26 +90,4 @@ function __init__()
   atexit(_close_cached_lmfdb)
 end
 
-function query_table_names(conn::FunSQL.SQLConnection)
-  q = From(SQLTable(:pg_tables; columns = [:tablename])) |>
-      Select(:tablename) |>
-      Order(Get.tablename)
-  res = DBInterface.execute(conn, q)
-  return getproperty.(rowtable(res), :tablename)
-end
-
-function query_meta_data(conn::FunSQL.SQLConnection{LibPQ.DBConnection})
-  tnames = query_table_names(conn)
-
-  q =  From(SQLTable(qualifiers = [:information_schema], :columns, columns = [:table_name :column_name :udt_name])) |>
-        Select(:table_name, :column_name, Fun(:regtype, Get(:udt_name)))
-  res = rowtable(DBInterface.execute(conn, q))
-
-  D = Dict{String, SQL.TableLayout}()
-  for t in tnames
-    D[t] = SQL.TableLayout(filter(r -> r.table_name == t, res))
-  end
-  return tnames, D
-end
-
 end # module LMFDBLite
