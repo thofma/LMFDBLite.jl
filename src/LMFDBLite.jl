@@ -13,6 +13,7 @@ import FunSQL: Where, Get, From, Fun, Select, Order, SQLTable, Limit, Agg, Group
 include("Types.jl")
 include("TableLayout.jl")
 include("Search.jl")
+include("Ordering.jl")
 include("SearchParameters/Quadratic.jl")
 include("SearchParameters/Lattice.jl")
 include("SearchParameters/Genus.jl")

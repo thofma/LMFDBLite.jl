@@ -91,6 +91,39 @@ arguments, they raise `ArgumentError`.
 Use `allof` and `anyof` for longer or mixed combinations; direct `|`
 between predicates and chains of `&` are not supported.
 
+## Ordering
+
+Pass `order_by` to `search` or any of the Hecke conversion functions to order
+matches before applying `limit`:
+
+```julia
+LMFDBLite.search(conn, "nf_fields";
+    degree = 2, order_by = :discriminant, limit = 10)
+
+LMFDBLite.elliptic_curves(conn;
+    order_by = (:conductor => :asc, :rank => :desc), limit = 10)
+```
+
+A symbol means ascending order. Use `parameter => :asc` or `parameter => :desc`
+to specify a direction, and a tuple or vector of these to specify several keys
+in priority order. Keys are public search parameter names, including supported
+aliases. Sorting supports scalar numeric, text, and boolean parameters.
+Signed discriminants sort by their signed value. Arrays, signatures, and
+stored rational pairs such as genus `mass` are not supported as sort keys.
+Text follows the database's text ordering; labels are not sorted as numbers.
+Invalid keys, directions, or duplicate keys (including aliases) raise `ArgumentError`.
+
+Missing values come last in either direction. Ascending `id` breaks ties, so
+results are reproducible while the underlying data stays unchanged. Custom
+databases must provide a unique non-null integer `id` column for ordered queries.
+Hecke objects preserve the order of their source records.
+
+The default `order_by = nothing` leaves results unordered. An empty tuple or
+vector does the same. With a finite `limit`, an unordered query selects an
+unspecified subset of the matches. Count functions accept and validate
+`order_by`, but omit sorting because it cannot change the count, including a
+capped count.
+
 ## Hecke and Oscar integration
 
 LMFDBLite comes with an optional interface to directly construct native

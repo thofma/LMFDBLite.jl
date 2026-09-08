@@ -1,9 +1,10 @@
 """
-    elliptic_curves(conn::LMFDBConnection; limit = Inf, kw...)
+    elliptic_curves(conn::LMFDBConnection; limit = Inf, order_by = nothing, kw...)
 
 Search the `ec_curvedata` table and convert matching records to Hecke elliptic
-curves over the rationals. Load Hecke to enable this method. Parameters and
-`limit` are forwarded to `LMFDBLite.search`.
+curves over the rationals. Load Hecke to enable this method. Parameters,
+`limit`, and `order_by` are forwarded to `LMFDBLite.search`; the resulting curves
+preserve the requested order.
 
 Common parameters include `label`, `cremona_label`, `isogeny_class`,
 `conductor`, `rank`, `analytic_rank`, `torsion_order`, `torsion_structure`,
@@ -27,11 +28,12 @@ function count_elliptic_curves(conn::LMFDBConnection; limit = Inf, kw...)
 end
 
 """
-    elliptic_curves_over_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+    elliptic_curves_over_number_fields(conn::LMFDBConnection; limit = Inf, order_by = nothing, kw...)
 
 Search `ec_nfcurves` and convert matching records to Hecke elliptic curves over
-number fields. Load Hecke to enable this method. Parameters and `limit` are
-forwarded to `LMFDBLite.search`.
+number fields. Load Hecke to enable this method. Parameters, `limit`, and
+`order_by` are forwarded to `LMFDBLite.search`; the resulting curves preserve
+the requested order.
 
 Common parameters include `label`, `field_label`, `degree`, `signature`,
 `conductor_label`, `conductor_norm`, `isogeny_class`, `rank`, `analytic_rank`,

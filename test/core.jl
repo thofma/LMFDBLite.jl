@@ -42,3 +42,4 @@ include("integer_ranges.jl")
 
 include("search_inputs.jl")
 include("elliptic_curve_number_field_conditions.jl")
+include("ordering.jl")

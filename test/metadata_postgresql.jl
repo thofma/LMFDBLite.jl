@@ -6,6 +6,7 @@ using Test
 import LibPQ
 
 include("elliptic_curve_number_field_database.jl")
+include("ordering_postgresql.jl")
 
 function test_metadata_database(options)
     raw = DBInterface.connect(LibPQ.Connection,
@@ -132,6 +133,7 @@ end
                        connect_timeout = 5, sslmode = "disable")
             test_metadata_database(options)
             test_number_field_curve_database(options)
+            test_ordering_database(options)
         catch
             isfile(log) && print(stderr, read(log, String))
             rethrow()

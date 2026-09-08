@@ -243,7 +243,8 @@ Check all number field declarations using `check_search_parameters(conn, "nf_fie
 """
 check_number_field_parameters(conn::LMFDBConnection) = check_search_parameters(conn, "nf_fields")
 
-function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
+function _search_query(conn::LMFDBConnection, tname::String, apply_order::Bool = true;
+                       limit = Inf, order_by = nothing, kw...)
   parameter_definitions = _search_parameter_definitions(tname)
   layout = table_layout(conn, tname)
   conds = Condition[]
@@ -259,7 +260,13 @@ function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
     _assert_parameter_columns(cond, columns, parameter)
     push!(conds, cond)
   end
+  # Validate ordering for searches and counts alike. Counts omit the ORDER BY
+  # itself because even a capped count is independent of which rows come first.
+  order_terms = _order_terms(tname, parameter_definitions, layout, order_by)
   q = From(tname) |> _create_where(conds)
+  if apply_order && !isempty(order_terms)
+    q = q |> Order(order_terms...)
+  end
   if limit != Inf
     q = q |> Limit(1:limit)
   end
@@ -267,28 +274,44 @@ function _search_query(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
 end
 
 """
-    search(conn, table; limit = Inf, kw...)
+    search(conn, table; limit = Inf, order_by = nothing, kw...)
 
 Search `nf_fields`, `ec_curvedata`, `ec_nfcurves`, `lat_lattices_new`, or `lat_genera` using
 their parameter definitions. Return a vector of database records. Validate the
 columns and types against the table's cached metadata before issuing the query,
 loading the layout on first use. Tables are resolved in `conn.schema`.
+
+`order_by` accepts a public parameter symbol (ascending), a pair such as
+`:rank => :desc`, or a tuple/vector of these in priority order. Directions must
+be `:asc` or `:desc`. Numeric, text, and boolean parameters are supported;
+signed discriminants sort by their signed value. Arrays, signatures, and
+stored rational pairs are not supported as sort keys. Text uses the database's
+text ordering, including for labels and text-encoded invariants.
+
+Sorting happens before `limit`. Missing values come last in both directions,
+and ascending `id` breaks ties. Custom databases must provide a unique non-null
+integer `id` column for ordered searches. `nothing` (the default) or an empty
+tuple/vector leaves the query unordered; a finite limit then selects an
+unspecified subset. The Hecke conversion functions forward `order_by` and
+preserve the resulting order.
 """
-function search(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
-  return rowtable(DBInterface.execute(conn.conn, _search_query(conn, tname; limit, kw...)))
+function search(conn::LMFDBConnection, tname::String; limit = Inf, order_by = nothing, kw...)
+  return rowtable(DBInterface.execute(conn.conn, _search_query(conn, tname; limit, order_by, kw...)))
 end
 
 """
-    count(conn, table; limit = Inf, kw...)
+    count(conn, table; limit = Inf, order_by = nothing, kw...)
 
 Count records with the same parameter definitions and validation as `search`.
 With `limit = n`, count at most `n` matching records (a capped count). Leave
 `limit = Inf` to count every match. The same rule applies to the type-specific
 `count_number_fields`, `count_elliptic_curves`,
 `count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and `count_genera` functions.
+`order_by` is accepted and validated as for `search`, but counting never sorts
+the records because ordering does not change the count.
 """
-function count(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
-  q = _search_query(conn, tname; limit, kw...) |> Group() |> Select(Agg.count())
+function count(conn::LMFDBConnection, tname::String; limit = Inf, order_by = nothing, kw...)
+  q = _search_query(conn, tname, false; limit, order_by, kw...) |> Group() |> Select(Agg.count())
   return rowtable(DBInterface.execute(conn.conn, q))[1][1]
 end
 

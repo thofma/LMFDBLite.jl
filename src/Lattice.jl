@@ -6,11 +6,13 @@ Retrieve a Hecke integer lattice by its LMFDB label. Load Hecke to enable this m
 function integer_lattice end
 
 """
-    integer_lattices(conn::LMFDBConnection; limit = Inf, kw...)
+    integer_lattices(conn::LMFDBConnection; limit = Inf, order_by = nothing, kw...)
 
 Search `lat_lattices_new` with `LMFDBLite.search` and convert the records to
 Hecke integer lattices, retaining their `:lmfdb_label` and available
 `:lmfdb_genus_label` attributes. Load Hecke to enable this method.
+`order_by` is forwarded to `search`, and the resulting lattices preserve the
+requested order.
 
 Parameters include `label`, `genus_label`, `rank`, `signature`, `level`,
 `class_number`, `is_even`, `discriminant`, `minimum`, `automorphism_group_order`,

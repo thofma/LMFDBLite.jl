@@ -28,6 +28,8 @@ end
         test_elliptic_curves(conn)
         include("elliptic_curves_number_fields.jl")
         test_elliptic_curves_over_number_fields(conn)
+        include("ordering_live.jl")
+        test_live_ordering(conn)
     finally
         DBInterface.close!(conn)
     end

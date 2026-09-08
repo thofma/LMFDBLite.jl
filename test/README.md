@@ -153,3 +153,11 @@ fractions and large coefficients, and verify that a result batch loads each
 distinct base field once and shares it between curves. The temporary database
 tests exercise searches and counts without Hecke. Live tests validate all
 declared column types, filters, counts, limits, full-label lookup, and conversion.
+
+Ordering tests validate public keys, aliases, directions, unsupported structured
+values, and required column types without a database. Temporary PostgreSQL tests
+use shuffled rows with ties and missing values to check ascending and descending
+orders, multiple keys, signed discriminants, ordering before limits, and the
+automatic `id` tie-breaker. They also check that unordered queries and counts
+omit `ORDER BY`. Live tests compare limited searches and Hecke objects with an
+independently sorted reference set.

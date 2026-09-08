@@ -1,9 +1,10 @@
 """
-    number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+    number_fields(conn::LMFDBConnection; limit = Inf, order_by = nothing, kw...)
 
 Search number fields with `LMFDBLite.search` and convert each record to a
 Hecke number field with its `:lmfdb_label` attribute. Load Hecke with `using Hecke`
-to enable this method. Search parameters and `limit` are forwarded to `search`.
+to enable this method. Search parameters, `limit`, and `order_by` are forwarded
+to `search`. The resulting objects preserve the requested order.
 
 Supported parameters include:
 

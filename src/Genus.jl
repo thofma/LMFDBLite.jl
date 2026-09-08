@@ -1,10 +1,12 @@
 """
-    genera(conn::LMFDBConnection; limit = Inf, kw...)
+    genera(conn::LMFDBConnection; limit = Inf, order_by = nothing, kw...)
 
 Search `lat_genera` with `LMFDBLite.search` and construct Hecke genera from
 their stored representative Gram matrices. Attach each genus's `:lmfdb_label`
 and cache lattice representatives when the database supplies the complete set.
 Load Hecke to enable this method.
+`order_by` is forwarded to `search`, and the resulting genera preserve the
+requested order.
 
 Parameters include `label`, `rank`, `signature`, `level`, `class_number`,
 `is_even`, `determinant`, `discriminant`, `disc_group_invs`,
