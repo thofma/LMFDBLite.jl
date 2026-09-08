@@ -61,6 +61,7 @@ function test_composition_inputs(convert_value)
                 (("nf_fields", :class_number, :class_number),
                  ("nf_fields", :degree, :degree),
                  ("ec_curvedata", :conductor, :conductor),
+                 ("ec_nfcurves", :conductor_norm, :conductor_norm),
                  ("lat_lattices_new", :rank, :rank), ("lat_genera", :rank, :rank))
             for (criterion, predicate) in cases
                 condition = composition_condition(table, parameter, criterion)
@@ -153,6 +154,7 @@ end
 
     @testset "Invalid nested scalar operators" begin
         for (table, parameter) in (("nf_fields", :class_number), ("ec_curvedata", :conductor),
+                                   ("ec_nfcurves", :conductor_norm),
                                    ("lat_lattices_new", :rank), ("lat_genera", :rank))
             for criterion in (allof(in(Int[]), includes([2])),
                               anyof(==(2), allof(>(0), includes([2]))))

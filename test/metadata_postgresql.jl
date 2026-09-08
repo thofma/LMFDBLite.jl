@@ -5,6 +5,8 @@ using DBInterface
 using Test
 import LibPQ
 
+include("elliptic_curve_number_field_database.jl")
+
 function test_metadata_database(options)
     raw = DBInterface.connect(LibPQ.Connection,
         "host=$(options.host) port=$(options.port) dbname=postgres user=lmfdblite_test")
@@ -129,6 +131,7 @@ end
                        user = "lmfdblite_test", password = "",
                        connect_timeout = 5, sslmode = "disable")
             test_metadata_database(options)
+            test_number_field_curve_database(options)
         catch
             isfile(log) && print(stderr, read(log, String))
             rethrow()

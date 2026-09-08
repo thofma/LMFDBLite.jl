@@ -1,5 +1,7 @@
 using Hecke
 
+include("elliptic_curve_number_field_conversion.jl")
+
 @testset "Hecke extension" begin
     @test Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt) !== nothing
     @test !isdefined(LMFDBLite, :number_field)
@@ -9,6 +11,7 @@ using Hecke
     @test hasmethod(Hecke.elliptic_curve, Tuple{LMFDBLite.LMFDBConnection, String})
     @test hasmethod(Hecke.genus, Tuple{LMFDBLite.LMFDBConnection, String})
     @test hasmethod(LMFDBLite.number_fields, Tuple{LMFDBLite.LMFDBConnection})
+    @test hasmethod(LMFDBLite.elliptic_curves_over_number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.integer_lattice, Tuple{LMFDBLite.LMFDBConnection, String})
 end
 
@@ -33,4 +36,3 @@ test_large_integer_ranges(Hecke.ZZ, big(10)^30)
         @test sizeof(sql) < 700
     end
 end
-

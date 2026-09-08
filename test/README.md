@@ -48,7 +48,7 @@ integer, discriminant, and ramification tests also use this syntax, including
 `ZZRingElem` inputs after Hecke loads. Live tests compare composed signature
 queries with independently filtered number-field, lattice, and genus records.
 
-Integer range tests cover every scalar integer parameter on all four tables,
+Integer range tests cover every scalar integer parameter on all supported tables,
 including aliases, signed discriminants, and Oscar/Hecke ranges. Ascending,
 explicit-step, and descending unit ranges must produce the same bounded SQL.
 Small reference sets check empty ranges and discrete vector membership. Ranges
@@ -117,7 +117,7 @@ introduce a second option, and that NUL characters and invalid timeouts are
 rejected before connecting.
 
 Input-validation tests cover text, Boolean, floating-point, structured integer
-array, and rational parameters on all four tables, including aliases. Invalid
+array, and rational parameters on all supported tables, including aliases. Invalid
 operands and operators must produce `ArgumentError` naming the parameter, also
 inside mixed conditions. Separate schema/invariant tests still expect internal
 errors for malformed declarations; those are not user-input failures.
@@ -133,7 +133,7 @@ filtered results with raw database records, including integer ranges, empty
 results, missing relative class numbers, and Hecke conversion with combined filters.
 
 All record retrieval uses `search`, which supports `nf_fields`, `ec_curvedata`,
-`lat_lattices_new`, and `lat_genera`. The previous search implementation and
+`ec_nfcurves`, `lat_lattices_new`, and `lat_genera`. The previous search implementation and
 lattice validation framework have been removed. `count` shares the parameter
 validation and query construction used by `search`.
 
@@ -145,3 +145,11 @@ Hecke extension methods for mathematical objects; there is no separate `raw` mod
 
 Elliptic-curve tests check the `ec_curvedata` parameter schema, scalar and array
 filters, signed discriminants, counts, and conversion to Hecke elliptic curves.
+
+Number field elliptic-curve tests cover `ec_nfcurves`, including its JSON
+signatures and torsion structures, integer arrays, and power-basis coefficient
+strings. Offline tests construct quadratic and cubic curves, check exact
+fractions and large coefficients, and verify that a result batch loads each
+distinct base field once and shares it between curves. The temporary database
+tests exercise searches and counts without Hecke. Live tests validate all
+declared column types, filters, counts, limits, full-label lookup, and conversion.

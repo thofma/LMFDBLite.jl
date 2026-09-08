@@ -26,6 +26,8 @@ end
         test_lattices_and_genera(conn)
         include("elliptic_curves.jl")
         test_elliptic_curves(conn)
+        include("elliptic_curves_number_fields.jl")
+        test_elliptic_curves_over_number_fields(conn)
     finally
         DBInterface.close!(conn)
     end

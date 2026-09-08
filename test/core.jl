@@ -19,10 +19,12 @@ using Test
     @test hasmethod(reset!, Tuple{LMFDBLite.LMFDBConnection})
     @test isempty(methods(LMFDBLite.number_fields))
     @test isempty(methods(LMFDBLite.elliptic_curves))
+    @test isempty(methods(LMFDBLite.elliptic_curves_over_number_fields))
     @test haskey(LMFDBLite._number_field_parameter_definitions(), :galois_group)
     @test haskey(LMFDBLite._elliptic_curve_parameter_definitions(), :conductor)
     @test hasmethod(LMFDBLite.count_number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.count_elliptic_curves, Tuple{LMFDBLite.LMFDBConnection})
+    @test hasmethod(LMFDBLite.count_elliptic_curves_over_number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.count_integer_lattices, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.count_genera, Tuple{LMFDBLite.LMFDBConnection})
 end
@@ -39,3 +41,4 @@ include("composition.jl")
 include("integer_ranges.jl")
 
 include("search_inputs.jl")
+include("elliptic_curve_number_field_conditions.jl")

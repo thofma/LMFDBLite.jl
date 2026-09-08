@@ -25,3 +25,37 @@ and `search`, without constructing Hecke elliptic curves.
 function count_elliptic_curves(conn::LMFDBConnection; limit = Inf, kw...)
   return count(conn, "ec_curvedata"; limit, kw...)
 end
+
+"""
+    elliptic_curves_over_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+
+Search `ec_nfcurves` and convert matching records to Hecke elliptic curves over
+number fields. Load Hecke to enable this method. Parameters and `limit` are
+forwarded to `LMFDBLite.search`.
+
+Common parameters include `label`, `field_label`, `degree`, `signature`,
+`conductor_label`, `conductor_norm`, `isogeny_class`, `rank`, `analytic_rank`,
+`torsion_order`, `torsion_structure`, `cm_discriminant`, and `is_q_curve`.
+Use `conductor_norm` for the integer norm of the conductor ideal.
+`a_invariants` and `j_invariant` match LMFDB's stored text: comma-separated
+rational power-basis coefficients, with semicolons between the five a-invariants.
+
+For example, use `field_label = "2.2.5.1"` to select curves over that field,
+or `field_label = in(["2.2.5.1", "2.0.4.1"])` to search over several fields.
+Omit `field_label` to search over all number fields in the table. Curves with
+the same field label in one result share a Hecke base field, constructed from
+the defining polynomial in `nf_fields`. Curves and their base fields carry
+their respective `:lmfdb_label` attributes.
+"""
+function elliptic_curves_over_number_fields end
+
+"""
+    count_elliptic_curves_over_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+
+Count records in `ec_nfcurves` using the same parameters as
+`elliptic_curves_over_number_fields`, without requiring Hecke or constructing
+curves or number fields. With `limit = n`, return at most `n` matches.
+"""
+function count_elliptic_curves_over_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
+  return count(conn, "ec_nfcurves"; limit, kw...)
+end

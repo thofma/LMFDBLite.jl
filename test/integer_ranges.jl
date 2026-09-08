@@ -2,7 +2,7 @@
 # with multiple physical columns. The helpers in composition.jl need no database.
 function integer_range_parameters()
     return [(table, parameter, spec)
-            for table in ("nf_fields", "ec_curvedata", "lat_lattices_new", "lat_genera")
+            for table in ("nf_fields", "ec_curvedata", "ec_nfcurves", "lat_lattices_new", "lat_genera")
             for (parameter, spec) in LMFDBLite._search_parameter_definitions(table)
             if spec[1] === BigInt && in in spec[5]]
 end

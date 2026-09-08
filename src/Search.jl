@@ -213,6 +213,8 @@ function _search_parameter_definitions(tname::String)
     return _genus_parameter_definitions()
   elseif tname == "ec_curvedata"
     return _elliptic_curve_parameter_definitions()
+  elseif tname == "ec_nfcurves"
+    return _number_field_elliptic_curve_parameter_definitions()
   end
   throw(ArgumentError("search has no parameter definitions for table `$tname`"))
 end
@@ -267,7 +269,7 @@ end
 """
     search(conn, table; limit = Inf, kw...)
 
-Search `nf_fields`, `ec_curvedata`, `lat_lattices_new`, or `lat_genera` using
+Search `nf_fields`, `ec_curvedata`, `ec_nfcurves`, `lat_lattices_new`, or `lat_genera` using
 their parameter definitions. Return a vector of database records. Validate the
 columns and types against the table's cached metadata before issuing the query,
 loading the layout on first use. Tables are resolved in `conn.schema`.
@@ -282,8 +284,8 @@ end
 Count records with the same parameter definitions and validation as `search`.
 With `limit = n`, count at most `n` matching records (a capped count). Leave
 `limit = Inf` to count every match. The same rule applies to the type-specific
-`count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`, and
-`count_genera` functions.
+`count_number_fields`, `count_elliptic_curves`,
+`count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and `count_genera` functions.
 """
 function count(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
   q = _search_query(conn, tname; limit, kw...) |> Group() |> Select(Agg.count())

@@ -34,14 +34,16 @@ LMFDBLite.count(conn, "nf_fields"; degree = 2, class_number = 1)
 
 With `limit = n`, `count` returns a capped count: the smaller of `n` and the
 number of matches. The default `limit = Inf` counts every match. This also applies
-to `count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`, and
-`count_genera`.
+to `count_number_fields`, `count_elliptic_curves`,
+`count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and `count_genera`.
 
 ## Supported tables
 
 At the moment, the following tables are supported, where "experimental" refers to experimental tables in the LMFDB itself:
+
 - `nf_fields`,
-- `ec_curvedata`,
+- `ec_curvedata` (elliptic curves over the rationals),
+- `ec_nfcurves` (elliptic curves over number fields),
 - `lat_lattices_new` (experimental),
 - `lat_genera` (experimental),
 
@@ -127,9 +129,35 @@ julia> LMFDBLite.genera(conn; rank = 1, limit = 3)
  Genus symbol: I_(1, 0) 29^1
 ```
 
-Use `count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`,
-and `count_genera` to count matching records without constructing Hecke
-objects.
+Use `count_number_fields`, `count_elliptic_curves`,
+`count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and
+`count_genera` to count matching records without constructing Hecke objects.
+
+For elliptic curves over number fields, use the separate functions
+`elliptic_curves_over_number_fields` and `count_elliptic_curves_over_number_fields`:
+
+```julia
+curves = LMFDBLite.elliptic_curves_over_number_fields(conn;
+    field_label = "2.2.5.1", conductor_norm = <=(100), limit = 3)
+E = elliptic_curve(conn, "2.2.5.1-31.1-a1")
+LMFDBLite.count_elliptic_curves_over_number_fields(conn;
+    field_label = "2.2.5.1", conductor_norm = <=(100))
+```
+
+Other filters include `degree`, `signature`, `conductor_label`, `isogeny_class`,
+`rank`, `analytic_rank`, `torsion_order`, `torsion_structure`, `cm_discriminant`,
+and `is_q_curve`. Here `conductor_norm` is the integer norm of the conductor ideal.
+Omit `field_label` to search across number fields, or use `in([labels...])` to
+select several. Curves with the same field label in one result share a base
+field constructed from LMFDB's defining polynomial. Both curves and base fields
+carry their respective `:lmfdb_label` attributes.
+
+Raw records are available through `LMFDBLite.search(conn, "ec_nfcurves"; ...)`.
+Raw searches and counts work without Hecke. The `a_invariants` and `j_invariant`
+filters match the stored text exactly: rational coefficients in increasing
+powers of the field generator, separated by commas, with semicolons separating
+the five a-invariants. For example, `a_invariants = "1,0;1,1;0,1;0,1;0,0"`.
+The Hecke conversion decodes these coefficients exactly in the labelled field.
 
 ## Custom connection
 

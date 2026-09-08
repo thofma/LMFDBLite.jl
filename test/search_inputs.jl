@@ -18,7 +18,7 @@ end
         Vector{BigInt} => ([2, 3], Any[2, (2, 3), ["bad"], 1:10^9]),
         Rational{BigInt} => (2//3, Any["bad", missing, [2, 3]]),
     )
-    for table in ("nf_fields", "ec_curvedata", "lat_lattices_new", "lat_genera")
+    for table in ("nf_fields", "ec_curvedata", "ec_nfcurves", "lat_lattices_new", "lat_genera")
         for (parameter, spec) in LMFDBLite._search_parameter_definitions(table)
             T, _, _, _, allowed = spec
             haskey(examples, T) || continue
