@@ -1,8 +1,10 @@
-The default suite makes read-only queries against the live LMFDB PostgreSQL database
-used by `LMFDBLite.lmfdb()` (`devmirror.lmfdb.xyz:5432` by default).
-They require network access; connection failures fail the test run.
+The default suite runs without a database connection. `core.jl` checks the raw
+query core; `hecke.jl` then checks the optional extension. Dependency installation
+may require network access, but the tests themselves do not contact PostgreSQL.
+CI runs these offline tests separately from local PostgreSQL and public-mirror
+integration jobs.
 
-Connection tests verify that `lmfdb()` constructs its default connection
+Opt-in connection tests verify that `lmfdb()` constructs its default connection
 lazily, returns the same object across calls and tasks, invalidates the cache
 when closed, and reconstructs it on demand. Type-specific count functions are
 checked against their corresponding raw searches.
@@ -71,8 +73,23 @@ Run from the package directory:
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-To use another LMFDB database, set any of `LMFDB_HOST`, `LMFDB_PORT`,
-`LMFDB_DBNAME`, `LMFDB_USER`, `LMFDB_PASSWORD`, and `LMFDB_SCHEMA` before running the tests.
+To include read-only integration queries, set `LMFDB_TEST_LIVE=true`. These use
+the public mirror by default (`devmirror.lmfdb.xyz:5432`). Set any of `LMFDB_HOST`,
+`LMFDB_PORT`, `LMFDB_DBNAME`, `LMFDB_USER`, `LMFDB_PASSWORD`, and `LMFDB_SCHEMA` to
+use another database. Overrides alone do not enable integration tests.
+Connection failures fail an enabled integration run.
+
+The cached-default smoke test is a separate opt-in:
+`LMFDB_TEST_PUBLIC_DEFAULT=true`. It deliberately tests bare `lmfdb()` against
+the public mirror and does not use the connection overrides. Keep it unset when
+testing a local database. To run both public integration groups:
+
+```sh
+LMFDB_TEST_LIVE=true LMFDB_TEST_PUBLIC_DEFAULT=true julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+The CI matrix starts at the minimum supported Julia version, 1.11. Each version
+runs both the core and Hecke tests through the normal `Pkg.test()` target.
 
 The metadata regression fixture creates a private temporary PostgreSQL cluster
 and tests unrelated unsupported types, same-named tables in different schemas,
@@ -88,8 +105,20 @@ containing PostgreSQL's `initdb` and `pg_ctl`. You can also run it independently
 LMFDB_POSTGRES_BIN=/path/to/postgresql/bin julia --project=. test/metadata_postgresql.jl
 ```
 
-Without this setting, the fixture is not run; the type mapping and live metadata
-checks still run as part of the normal suite.
+Without this setting, the fixture is not run. Type mapping tests always run;
+live metadata checks run only with `LMFDB_TEST_LIVE=true`.
+
+Connection-string tests use libpq's parser without connecting and verify literal
+values for all constructor fields and TLS options, including whitespace, quotes,
+backslashes, Unicode, and empty strings. They also check that one field cannot
+introduce a second option, and that NUL characters and invalid timeouts are
+rejected before connecting.
+
+Input-validation tests cover text, Boolean, floating-point, structured integer
+array, and rational parameters on all four tables, including aliases. Invalid
+operands and operators must produce `ArgumentError` naming the parameter, also
+inside mixed conditions. Separate schema/invariant tests still expect internal
+errors for malformed declarations; those are not user-input failures.
 
 Root discriminant tests cover scalar values, comparisons, list membership, and
 combined bounds. Equality and membership compare the stored floating-point `rd`

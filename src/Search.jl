@@ -280,6 +280,10 @@ end
     count(conn, table; limit = Inf, kw...)
 
 Count records with the same parameter definitions and validation as `search`.
+With `limit = n`, count at most `n` matching records (a capped count). Leave
+`limit = Inf` to count every match. The same rule applies to the type-specific
+`count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`, and
+`count_genera` functions.
 """
 function count(conn::LMFDBConnection, tname::String; limit = Inf, kw...)
   q = _search_query(conn, tname; limit, kw...) |> Group() |> Select(Agg.count())
@@ -300,7 +304,7 @@ end
 # calling the builder, then verifies that its Condition uses only declared columns.
 # The declared input type describes the parameter; the builder performs conversion.
 #
-# Integer, integer-set, signed-discriminant, and signature builders use two passes:
+# All parameter builders use two passes:
 #   1. _normalize_condition wraps bare values in equality, validates operators and
 #      resolves aliases, and converts operands throughout the input And/Or tree.
 #   2. _build_condition maps each normalized Fix2 predicate to a Condition. A leaf
@@ -308,9 +312,9 @@ end
 # Normalization finishes first so an invalid branch is rejected even if another
 # branch makes the result constant. Operands remain Julia values until lowering.
 #
-# Other scalar transformations (__create_cond_trafo) have their own builders,
-# but produce the same Condition representation. Conditions.jl translates it to
-# FunSQL with create_fun; _create_where joins keyword conditions with AND.
+# Scalar builders convert to the declared input type during normalization and
+# apply any storage encoding in the leaf builder. Conditions.jl translates the
+# result to FunSQL with create_fun; _create_where joins keyword conditions with AND.
 # No database connection is needed to normalize, build, or render a tree.
 #
 # When adding a parameter, declare every column it uses and choose a builder that
@@ -479,34 +483,36 @@ function __create_cond_signed_split(v, k, kabs, ksign, origin, allowed::Vector)
   end
 end
 
-function __create_cond_trafo(op::Base.Fix2, k, knew, trafo, origin, allowed::Vector)
-  if !(op.f in allowed)
-    error("only the following allowed for `$origin`: $(join(allowed, " "))")
+function _search_value(value, ::Type{T}, origin) where T
+  try
+    return T(value)
+  catch err
+    # Only input-conversion failures become ArgumentError. Internal assertions
+    # and unrelated exceptions must remain visible as implementation errors.
+    err isa Union{MethodError, InexactError, ArgumentError, DomainError, OverflowError} || rethrow()
+    throw(ArgumentError("search parameter `$origin` requires a value convertible to $T; got $(typeof(value))"))
   end
-  return _create_cond_trafo(op, k, knew, trafo)
 end
 
-function __create_cond_trafo(v::LMFDBLite.And, k, knew, trafo, origin, allowed::Vector)
-  return __create_cond_trafo(v.a, k, knew, trafo, origin, allowed) &
-         __create_cond_trafo(v.b, k, knew, trafo, origin, allowed)
-end
+_search_value(value, ::Type{Vector{BigInt}}, origin) =
+  _normalize_integer_array_operand(==, value, origin)
 
-function __create_cond_trafo(v::LMFDBLite.Or, k, knew, trafo, origin, allowed::Vector)
-  return __create_cond_trafo(v.a, k, knew, trafo, origin, allowed) |
-         __create_cond_trafo(v.b, k, knew, trafo, origin, allowed)
-end
-
-function __create_cond_trafo(val, k, knew, trafo, origin, allowed::Vector)
-  # todo: assert the type of val
-  return __create_cond_trafo(==(val), k, knew, trafo, origin, allowed)
-end
-
-function _create_cond_trafo(op::Base.Fix2, k, knew, trafo)
-  if op.f === in
-    @assert op.x isa AbstractVector
-    return create_cond(knew, op.f(trafo.(op.x)))
-  else
-    return create_cond(knew, op.f(trafo(op.x)))
+function _create_transformed_cond(k, value, origin, allowed, T, transform)
+  function normalize_operand(op, operand, origin)
+    if op === in
+      operand isa AbstractVector ||
+        throw(ArgumentError("search parameter `$origin` requires a vector for membership"))
+      return [_search_value(x, T, origin) for x in operand]
+    end
+    return _search_value(operand, T, origin)
+  end
+  normalized = _normalize_condition(value, origin, allowed, normalize_operand)
+  return _build_condition(normalized) do op
+    if op.f === in
+      isempty(op.x) && return FalseC()
+      return create_cond(k, in(transform.(op.x)))
+    end
+    return create_cond(k, Base.Fix2(op.f, transform(op.x)))
   end
 end
 
@@ -543,6 +549,6 @@ function _scalar_parameter(T, sqltype, column, allowed = Any[==, <=, >=, >, <, i
   # Integer conversion must inspect range endpoints and step before any broadcast.
   # This also handles Hecke/Oscar ranges whose elements are not subtypes of Integer.
   builder = transform === BigInt ? _create_integer_cond :
-            (k, v, origin, ops) -> __create_cond_trafo(v, k, k, transform, origin, ops)
+            (k, v, origin, ops) -> _create_transformed_cond(k, v, origin, ops, T, transform)
   return (T, sqltype, column, builder, allowed)
 end

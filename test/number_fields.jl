@@ -66,7 +66,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
         end
 
         @testset "Unsupported comparison" begin
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 galois_group = <("4T2"), limit = 1)
         end
     end
@@ -95,9 +95,9 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
         end
 
         @testset "Unsupported operators" begin
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 is_galois = <(true), limit = 1)
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 is_galois = in([true, false]), limit = 1)
         end
     end
@@ -133,9 +133,9 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
         end
 
         @testset "Unsupported operators" begin
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 root_discriminant = LMFDBLite.includes([2.0]), limit = 1)
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 root_discriminant = allof(>=(2.0), LMFDBLite.includes([2.0])), limit = 1)
         end
     end
@@ -155,7 +155,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 @test labels(rows) == Set(filter isa Base.Fix2{typeof(in)} ? expected : expected[1:1])
             end
             @test isempty(LMFDBLite.search(conn, "nf_fields"; label = in(String[])))
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields"; label = <(expected[1]))
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields"; label = <(expected[1]))
         end
 
         @testset "Signature" begin
@@ -213,7 +213,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 label = "2.2.12.1", class_group = Int[], narrow_class_group = [2],
                 class_number = 1, narrow_class_number = 2)
             @test labels(rows) == Set(["2.2.12.1"])
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 narrow_class_group = LMFDBLite.includes([2]), limit = 1)
         end
 
@@ -231,7 +231,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 expected = filter(r -> predicate(Float64(getproperty(r, column))), reference)
                 @test labels(rows) == labels(expected)
             end
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 parameter => LMFDBLite.includes([1]), limit = 1)
         end
 
@@ -250,9 +250,9 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 @test labels(rows) == labels(filter(r -> getproperty(r, column) === value, samples))
                 @test length(rows) == 1
             end
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 parameter => <(true), limit = 1)
-            @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
+            @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields";
                 parameter => in([true, false]), limit = 1)
         end
 

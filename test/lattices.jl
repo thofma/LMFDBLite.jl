@@ -102,7 +102,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         end
         rows = LMFDBLite.search(conn, "lat_genera"; label = in(pool), mass = 1//2)
         @test labels(rows) == Set(pool)
-        @test_throws ErrorException LMFDBLite.search(conn, "lat_genera"; mass = <(1//2), limit = 1)
+        @test_throws ArgumentError LMFDBLite.search(conn, "lat_genera"; mass = <(1//2), limit = 1)
         @test_throws ArgumentError LMFDBLite.search(conn, "lat_genera"; genus_label = sample.label, limit = 1)
 
         genera = LMFDBLite.genera(conn; label = in(pool), signature = (1, 0))

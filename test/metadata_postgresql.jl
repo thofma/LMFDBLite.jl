@@ -32,6 +32,7 @@ function test_metadata_database(options)
     conn = LMFDBLite.LMFDBConnection(; options...)
     try
         @test conn.schema == "public"
+        @test only(ci.val for ci in LibPQ.conninfo(conn.conn.raw.conn) if ci.keyword == "sslmode") == "disable"
         @test isempty(conn.table_layouts)
         @test Set(conn.table_names) == Set(["nf_fields", "unrelated", "mapping_types", "field_view"])
         @test length(conn.table_names) == length(unique(conn.table_names))
@@ -125,7 +126,8 @@ end
             run(pipeline(`$pg_ctl -D $data -l $log -o $("-F -k $root -h '' -p 65432") -w -t 30 start`;
                          stdout = devnull))
             options = (; host = root, port = "65432", dbname = "postgres",
-                       user = "lmfdblite_test", password = "")
+                       user = "lmfdblite_test", password = "",
+                       connect_timeout = 5, sslmode = "disable")
             test_metadata_database(options)
         catch
             isfile(log) && print(stderr, read(log, String))

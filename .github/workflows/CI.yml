@@ -13,13 +13,12 @@ concurrency:
 
 jobs:
   test:
-    name: Julia ${{ matrix.julia-version }}
+    name: Offline Julia ${{ matrix.julia-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         julia-version:
-          - '1.10'
           - '1.11'
           - '1.12'
           - '1.13-nightly'
@@ -37,3 +36,34 @@ jobs:
         uses: julia-actions/julia-buildpkg@v1
       - name: Run tests
         uses: julia-actions/julia-runtest@v1
+
+  postgres:
+    name: Local PostgreSQL integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v3
+      - name: Install PostgreSQL fixture tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql libpq-dev
+          echo "LMFDB_POSTGRES_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
+      - name: Run private PostgreSQL fixture
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); include("test/metadata_postgresql.jl")'
+
+  live:
+    name: Public LMFDB integration
+    runs-on: ubuntu-latest
+    env:
+      LMFDB_TEST_LIVE: 'true'
+      LMFDB_TEST_PUBLIC_DEFAULT: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-runtest@v1

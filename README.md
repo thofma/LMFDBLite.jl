@@ -18,9 +18,17 @@ records = LMFDBLite.search(conn, "nf_fields";
 
 The call `lmfdb()` constructs the default `LMFDBConnection` on its first call and
 returns that cached connection on subsequent calls. Construct
-`LMFDBConnection(; host, port, dbname, user, password, schema = "public")` directly
-when a custom, independently managed connection is needed. Call `reset!(conn)` to reset the
+`LMFDBLite.LMFDBConnection(; host, port, dbname, user, password, schema = "public")`
+directly when a custom, independently managed connection is needed. Call `reset!(conn)` to reset the
 connection to the [LMFDB](https://www.lmfdb.org/).
+
+Connection values may contain spaces, quotes, or backslashes; pass their literal
+values without adding connection-string escaping. The constructor also accepts
+`connect_timeout` (initial connection timeout in seconds, default `0` for none)
+and libpq's `sslmode`, `sslrootcert`, `sslcert`, and `sslkey`
+[TLS options](https://www.postgresql.org/docs/current/libpq-connect.html). TLS
+options default to `nothing`, preserving libpq's environment/default settings.
+The connection timeout does not limit queries or `reset!`.
 
 The connection reflects tables in the selected schema and uses that same schema
 for searches and column metadata, independently of PostgreSQL's `search_path`.
@@ -41,6 +49,11 @@ records. For example:
 LMFDBLite.count(conn, "nf_fields"; degree = 2, class_number = 1)
 ```
 
+With `limit = n`, `count` returns a capped count: the smaller of `n` and the
+number of matches. The default `limit = Inf` counts every match. This also applies
+to `count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`, and
+`count_genera`.
+
 ## Supported tables
 
 At the moment, the following tables are supported, where "experimental" refers to experimental tables in the LMFDB itself:
@@ -53,7 +66,8 @@ At the moment, the following tables are supported, where "experimental" refers t
 
 Search conditions are passed as keyword values. The operators available for a
 particular parameter depend on its type; using an unsupported operator raises an
-error.
+`ArgumentError` naming the parameter and its supported operators. Invalid operands
+also raise `ArgumentError` with the required input form or conversion type.
 
 - Scalar numeric parameters accept a bare value or `==(value)` for equality,
   and the comparisons `<(value)`, `<=(value)`, `>(value)`, and `>=(value)`.
@@ -162,3 +176,6 @@ julia> LMFDBLite.genera(conn; rank = 1, limit = 3)
 Use `count_number_fields`, `count_elliptic_curves`, `count_integer_lattices`,
 and `count_genera` to count matching records without constructing Hecke
 objects.
+
+This package was inspired by the Python
+[lmfdb-lite project](https://github.com/roed314/lmfdb-lite).
