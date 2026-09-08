@@ -19,9 +19,11 @@ Parameters include `label`, `genus_label`, `rank`, `signature`, `level`,
 `festi_veniani_index`, `conway_symbol`, `dual_conway_symbol`, and `scale`.
 
 A signature `(nplus, nminus)` constrains both the rank and the positive index.
+Use `anyof((2, 0), (1, 1))` to accept either of two signatures.
 Integer parameters accept comparisons, vector/range membership, and combined
-bounds with `&`. Labels accept equality and vector membership. Boolean parameters
-accept equality. Gram matrices are flattened integer vectors, and group invariants
+bounds with `allof`. Conditions for one parameter can be nested using `allof`
+(AND) and `anyof` (OR). Labels accept equality and vector membership. Boolean
+parameters accept equality. Gram matrices are flattened integer vectors, and group invariants
 are integer vectors; both accept equality. `dual_determinant` uses `Float64` inputs
 and compares stored numerical values. The database column names `nplus`, `disc`,
 and `discriminant_group_invs` are also supported.

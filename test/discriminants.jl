@@ -47,15 +47,17 @@ function test_discriminant_inputs(convert_value)
             (in(values), d -> d in [-4, 0, 5]),
             (in(view(values, 1:2)), d -> d in [-4, 0]),
             (in(empty_values), d -> false),
-            (>=(convert_value(-4)) & <=(convert_value(5)), d -> -4 <= d <= 5),
-            (LMFDBLite.Or(==(convert_value(-4)), ==(convert_value(5))), d -> d in [-4, 5]),
-            (LMFDBLite.And(LMFDBLite.Or(==(convert_value(-4)), ==(convert_value(5))),
-                           >=(convert_value(0))), d -> d == 5),
-            (LMFDBLite.Or(LMFDBLite.And(>=(convert_value(-8)), <=(convert_value(-3))),
-                          LMFDBLite.And(>(convert_value(3)), <(convert_value(8)))),
+            (allof(>=(convert_value(-4)), <=(convert_value(5))), d -> -4 <= d <= 5),
+            (allof(>=(convert_value(-4)), <=(convert_value(5)), in(values)), d -> d in [-4, 0, 5]),
+            (anyof(==(convert_value(-4)), ==(convert_value(5)), ==(convert_value(8))), d -> d in [-4, 5, 8]),
+            (anyof(==(convert_value(-4)), ==(convert_value(5))), d -> d in [-4, 5]),
+            (allof(anyof(==(convert_value(-4)), ==(convert_value(5))),
+                   >=(convert_value(0))), d -> d == 5),
+            (anyof(allof(>=(convert_value(-8)), <=(convert_value(-3))),
+                   allof(>(convert_value(3)), <(convert_value(8)))),
              d -> -8 <= d <= -3 || 3 < d < 8),
-            (LMFDBLite.Or(in(empty_values), ==(convert_value(-4))), d -> d == -4),
-            (LMFDBLite.And(in(empty_values), ==(convert_value(-4))), d -> false),
+            (anyof(in(empty_values), ==(convert_value(-4))), d -> d == -4),
+            (allof(in(empty_values), ==(convert_value(-4))), d -> false),
         ]
         for bound in (-4, 0, 5)
             push!(cases, (convert_value(bound), ==(bound)))
@@ -143,8 +145,8 @@ end
                    !=(-4), LMFDBLite.includes([-4, 5]))
         for table in ("nf_fields", "ec_curvedata"), bad in invalid
             # Even a branch made irrelevant by empty membership must be validated.
-            for criterion in (bad, LMFDBLite.And(in(Int[]), bad),
-                              LMFDBLite.Or(==(1), LMFDBLite.And(>=(0), bad)))
+            for criterion in (bad, allof(in(Int[]), bad),
+                              anyof(==(1), allof(>=(0), bad)))
                 err = try
                     discriminant_condition(table, criterion)
                 catch e
@@ -172,9 +174,9 @@ function test_live_discriminants(conn, table, reference; bounds...)
             (in(Hecke.ZZ.([a, b])), d -> d in (a, b)),
             (in(Int[]), d -> false), (in(Hecke.ZZRingElem[]), d -> false),
             (in(Int(a):Int(b)), d -> a <= d <= b),
-            (>=(Hecke.ZZ(a)) & <=(Hecke.ZZ(b)), d -> a <= d <= b),
-            (LMFDBLite.Or(==(Int(a)), ==(Hecke.ZZ(b))), d -> d in (a, b)),
-            (LMFDBLite.And(LMFDBLite.Or(==(Int(a)), ==(Hecke.ZZ(b))), >(Int(a))), d -> d == b && d > a),
+            (allof(>=(Hecke.ZZ(a)), <=(Hecke.ZZ(b))), d -> a <= d <= b),
+            (anyof(==(Int(a)), ==(Hecke.ZZ(b))), d -> d in (a, b)),
+            (allof(anyof(==(Int(a)), ==(Hecke.ZZ(b))), >(Int(a))), d -> d == b && d > a),
         ]
         for (criterion, predicate) in cases
             rows = LMFDBLite.search(conn, table; bounds..., discriminant = criterion)

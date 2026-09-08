@@ -14,7 +14,8 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         reference = LMFDBLite.search(conn, table; rank = 1, limit = 3)
         @test length(reference) == 3
         pool = [r.label for r in reference]
-        for criterion in (1, ==(1), in(1:2), >=(1) & <=(2))
+        test_live_signature_composition(conn, table, reference)
+        for criterion in (1, ==(1), in(1:2), allof(>=(1), <=(2)))
             rows = LMFDBLite.search(conn, table; label = in(pool), rank = criterion)
             @test labels(rows) == Set(pool)
         end
@@ -40,7 +41,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         @test_throws ArgumentError LMFDBLite.search(conn, table; degree = 2, limit = 1)
         @test_throws ArgumentError LMFDBLite.search(conn, table; signature = (-1, 2), limit = 1)
         @test_throws ErrorException LMFDBLite.search(conn, table; rank = LMFDBLite.includes([1]), limit = 1)
-        @test_throws ErrorException LMFDBLite.search(conn, table; signature = <((1, 0)), limit = 1)
+        @test_throws ArgumentError LMFDBLite.search(conn, table; signature = <((1, 0)), limit = 1)
     end
 
     @testset "Lattice filters and Hecke conversion" begin

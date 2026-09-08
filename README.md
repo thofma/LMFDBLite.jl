@@ -51,8 +51,10 @@ error.
   For example, `degree = ==(4)` and `degree = >=(4)`.
 - Use `in([values...])` to match any value in a list. Integer parameters also
   accept an inclusive unit range, such as `conductor = in(11:100)`.
-- Combine conditions with `&` (logical and) or `|` (logical or), for example
-  `class_number = >=(2) & <=(10)`.
+- Combine conditions for one parameter with `allof` (logical and) or `anyof`
+  (logical or), for example `class_number = allof(>=(2), <=(10))` or
+  `class_number = anyof(==(1), ==(2))`. Both accept three or more conditions and
+  can be nested: `class_number = allof(>=(2), anyof(==(3), ==(5)))`.
 - Text parameters such as `label` accept a string for equality or
   `in(["2.2.5.1", "2.2.8.1"])` for membership.
 - Boolean parameters accept `true`, `false`, or explicit equality such as
@@ -69,6 +71,17 @@ error.
   no required primes; `ramified = Int[]` or `ramified = issubset(Int[])` selects
   empty ramification sets. Class-group equality remains order-sensitive.
 - In all cases, `x = val` is shorthand for `x = ==(val)`.
+
+Composition also works for structured parameters, for example
+`signature = anyof((2, 0), (0, 1))`. Each signature alternative constrains both
+of its database columns together. All branches must use operators and values
+supported by that parameter. Different keyword parameters are combined with AND.
+With one argument, `allof` and `anyof` return that argument unchanged; with no
+arguments, they raise `ArgumentError`.
+
+The existing `&(Function, Function)` overload remains available for combining two
+predicates. Use `allof` and `anyof` for longer or mixed combinations; direct `|`
+between predicates and chains of `&` are not supported.
 
 Signed `discriminant` searches for number fields and elliptic curves, and number
 field `degree`, `ramified_prime_count`, and `ramified` searches, convert operands

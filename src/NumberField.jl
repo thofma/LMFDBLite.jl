@@ -12,9 +12,10 @@ Supported parameters include:
 - `signature`: `(r1, r2)` or `[r1, r2]`, optionally wrapped in `==`, where
   `r1` counts real embeddings and `r2` counts pairs of complex embeddings.
   This constrains the degree to `r1 + 2r2` as well as the signature.
+  Use `anyof((2, 0), (0, 1))` to accept either of two signatures.
 - `class_number`, `narrow_class_number`, `relative_class_number`, `index`:
   an integer, a comparison (`==`, `<`, `<=`, `>`, `>=`), or `in` with an
-  integer vector or range. Combine bounds with `&`, e.g. `>=(2) & <=(10)`.
+  integer vector or range. Combine bounds with `allof`, e.g. `allof(>=(2), <=(10))`.
 - `class_group`, `narrow_class_group`: a vector of invariant factors in
   increasing divisibility order, optionally wrapped in `==`. Use `Int[]`
   for the trivial group.
@@ -24,6 +25,9 @@ Supported parameters include:
 - `is_galois`, `is_cyclic`, `is_abelian`, `is_solvable`, `is_cm`,
   `is_minimal_sibling`: `true`, `false`, or an explicit equality.
 - `degree`, `discriminant`, `ramified`, `ramified_prime_count` are also available.
+
+Conditions for one parameter can be combined with `allof` (AND) and `anyof` (OR),
+including nested combinations. Each branch must use a supported operator and value.
 
 For example, search for real quadratic fields with class number one but
 narrow class number two:

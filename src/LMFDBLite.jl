@@ -1,6 +1,6 @@
 module LMFDBLite
 
-export lmfdb, includes, reset!
+export lmfdb, includes, reset!, allof, anyof
 
 using LibPQ
 using Tables

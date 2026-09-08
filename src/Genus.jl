@@ -13,6 +13,8 @@ Parameters include `label`, `rank`, `signature`, `level`, `class_number`,
 
 Signatures are `(nplus, nminus)`. Integer parameters support comparisons and
 vector/range membership; labels support equality and vector membership.
+Combine conditions for one parameter with `allof` (AND) and `anyof` (OR),
+including signatures, e.g. `signature = anyof((2, 0), (1, 1))`.
 Boolean and vector parameters support equality. `mass` supports exact rational
 equality, e.g. `mass = 1//2`. Gram matrices are flattened integer vectors.
 The database column names `nplus`, `disc`, `det`, `rep`, and

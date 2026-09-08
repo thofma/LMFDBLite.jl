@@ -12,7 +12,9 @@ using Test
     @test !isdefined(LMFDBLite, :genus)
     @test lmfdb === LMFDBLite.lmfdb
     @test includes === LMFDBLite.includes
-    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!))
+    @test allof === LMFDBLite.allof
+    @test anyof === LMFDBLite.anyof
+    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!, :allof, :anyof))
     @test reset! === LMFDBLite.reset!
     @test hasmethod(reset!, Tuple{LMFDBLite.LMFDBConnection})
     @test isempty(methods(LMFDBLite.number_fields))
@@ -28,6 +30,7 @@ end
 include("parameter_consistency.jl")
 include("discriminants.jl")
 include("number_field_conditions.jl")
+include("composition.jl")
 
 using Hecke
 
@@ -49,6 +52,7 @@ test_discriminant_ranges(Hecke.ZZ)
 test_number_field_conditions(Hecke.ZZ)
 test_number_field_integer_ranges(Hecke.ZZ)
 test_large_number_field_conditions(Hecke.ZZ)
+test_composition_inputs(Hecke.ZZ)
 
 @testset "ZZRingElem discriminants beyond machine integers" begin
     value = big(2)^128 + 1

@@ -37,11 +37,12 @@ function integer_condition_cases(convert_value)
         (>(convert_value(2)), >(2)), (>=(convert_value(2)), >=(2)),
         (in(convert_value.([0, 2, 3])), d -> d in (0, 2, 3)),
         (in(convert_value.(Int[])), d -> false),
-        (>=(convert_value(1)) & <=(convert_value(3)), d -> 1 <= d <= 3),
-        (LMFDBLite.Or(==(convert_value(0)), >(convert_value(2))), d -> d == 0 || d > 2),
-        (LMFDBLite.And(LMFDBLite.Or(==(convert_value(0)), >(convert_value(2))),
-                       <(convert_value(4))), d -> (d == 0 || d > 2) && d < 4),
-        (LMFDBLite.Or(in(convert_value.(Int[])), ==(convert_value(2))), ==(2)),
+        (allof(>=(convert_value(1)), <=(convert_value(3))), d -> 1 <= d <= 3),
+        (allof(>=(convert_value(1)), <=(convert_value(3)), in(convert_value.([1, 3, 5]))), d -> d in (1, 3)),
+        (anyof(==(convert_value(0)), >(convert_value(2))), d -> d == 0 || d > 2),
+        (allof(anyof(==(convert_value(0)), >(convert_value(2))),
+               <(convert_value(4))), d -> (d == 0 || d > 2) && d < 4),
+        (anyof(in(convert_value.(Int[])), ==(convert_value(2))), ==(2)),
     ]
 end
 
@@ -59,11 +60,15 @@ function ramified_condition_cases(convert_value)
         (LMFDBLite.includes(convert_value.(Int[])), x -> true),
         (issubset(convert_value.(Int[])), isempty),
         (LMFDBLite.includes(view(convert_value.([2, 3]), 1:1)), x -> 2 in x),
-        (LMFDBLite.And(LMFDBLite.Or(==(convert_value.([2])),
-                                    LMFDBLite.includes(convert_value.([3]))),
-                       issubset(convert_value.([2, 3]))),
+        (allof(LMFDBLite.includes(convert_value.([2])),
+               issubset(convert_value.([2, 3, 5])),
+               anyof(==(convert_value.([2])), ==(convert_value.([2, 3])))),
+         x -> Set(x) == Set([2]) || Set(x) == Set([2, 3])),
+        (allof(anyof(==(convert_value.([2])),
+                     LMFDBLite.includes(convert_value.([3]))),
+               issubset(convert_value.([2, 3]))),
          x -> (Set(x) == Set([2]) || 3 in x) && all(p -> p in (2, 3), x)),
-        (LMFDBLite.Or(==(convert_value.(Int[])), LMFDBLite.includes(convert_value.([5]))),
+        (anyof(==(convert_value.(Int[])), LMFDBLite.includes(convert_value.([5]))),
          x -> isempty(x) || 5 in x),
     ])
     return cases
@@ -152,8 +157,8 @@ end
         for parameter in (:degree, :ramified_prime_count, :ramified)
             invalid = parameter == :ramified ? set_invalid : scalar_invalid
             valid = parameter == :ramified ? LMFDBLite.includes(Int[]) : in(Int[])
-            for bad in invalid, criterion in (bad, LMFDBLite.And(valid, bad),
-                                               LMFDBLite.Or(valid, LMFDBLite.And(valid, bad)))
+            for bad in invalid, criterion in (bad, allof(valid, bad),
+                                             anyof(valid, allof(valid, bad)))
                 err = try
                     number_field_condition(parameter, criterion)
                 catch e
@@ -185,6 +190,7 @@ function test_live_number_field_conditions(conn)
         labels(rows) = Set(r.label for r in rows)
         @test labels(reference) == Set(selected)
         @test any(r -> isempty(r.ramps), reference)
+        test_live_signature_composition(conn, "nf_fields", reference)
         for T in (Int, Hecke.ZZ)
             for (parameter, column) in ((:degree, :degree), (:ramified_prime_count, :num_ram))
                 for (criterion, predicate) in integer_condition_cases(T)

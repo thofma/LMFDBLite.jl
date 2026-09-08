@@ -38,6 +38,14 @@ convertible type, and (after loading Hecke) `ZZRingElem`. Live tests compare
 against a small reference set that includes the rational field with no ramified
 primes.
 
+Boolean composition tests use the public `allof` and `anyof` functions for
+three-condition and nested combinations across all supported tables. They check
+single-argument and empty calls, invalid nested operators, and both columns of
+each signature alternative against independent reference signatures. Existing
+integer, discriminant, and ramification tests also use this syntax, including
+`ZZRingElem` inputs after Hecke loads. Live tests compare composed signature
+queries with independently filtered number-field, lattice, and genus records.
+
 You can run the complete declaration check on an existing connection with
 `LMFDBLite.check_number_field_parameters(conn)`, or use
 `LMFDBLite.check_search_parameters(conn, table)` for any supported table.

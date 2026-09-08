@@ -119,8 +119,8 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
             (>=(2.0), [-8, -7, -4, 5, 8]),
             (<=(2.5), [-4, -3, 5]),
             (in([2.0, sample.rd]), [-4, 5]),
-            (>=(2.0) & <=(2.5), [-4, 5]),
-            (LMFDBLite.Or(<=(2.0), >(2.5)), [-8, -7, -4, -3, 8]),
+            (allof(>=(2.0), <=(2.5)), [-4, 5]),
+            (anyof(<=(2.0), >(2.5)), [-8, -7, -4, -3, 8]),
             (<(1.0), Int[]),
         ]
         @testset "Filter: $filter" for (filter, expected_discriminants) in cases
@@ -136,7 +136,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
             @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
                 root_discriminant = LMFDBLite.includes([2.0]), limit = 1)
             @test_throws ErrorException LMFDBLite.search(conn, "nf_fields";
-                root_discriminant = >=(2.0) & LMFDBLite.includes([2.0]), limit = 1)
+                root_discriminant = allof(>=(2.0), LMFDBLite.includes([2.0])), limit = 1)
         end
     end
 
@@ -171,7 +171,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields"; signature = invalid)
             end
             for invalid in (<((2, 0)), in([(2, 0), (0, 1)]))
-                @test_throws ErrorException LMFDBLite.search(conn, "nf_fields"; signature = invalid)
+                @test_throws ArgumentError LMFDBLite.search(conn, "nf_fields"; signature = invalid)
             end
         end
 
@@ -183,8 +183,8 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 (in(1:2), in(1:2)), (in(1:2:5), in(1:2:5)),
                 (in(2:1), _ -> false), (in(Int[]), _ -> false),
                 (in(big(1):big(10)^30), >=(1)),
-                (>=(2) & <=(3), x -> 2 <= x <= 3),
-                (LMFDBLite.Or(==(1), >(3)), x -> x == 1 || x > 3),
+                (allof(>=(2), <=(3)), x -> 2 <= x <= 3),
+                (anyof(==(1), >(3)), x -> x == 1 || x > 3),
             ]
             for (criterion, predicate) in cases
                 rows = LMFDBLite.search(conn, "nf_fields"; bounds..., parameter => criterion)
@@ -223,7 +223,7 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
                 (<(boundary), <(boundary)), (<=(boundary), <=(boundary)),
                 (>(boundary), >(boundary)), (>=(boundary), >=(boundary)),
                 (in([boundary, boundary + 1]), in([boundary, boundary + 1])),
-                (>=(boundary) & <=(boundary + 1), x -> boundary <= x <= boundary + 1),
+                (allof(>=(boundary), <=(boundary + 1)), x -> boundary <= x <= boundary + 1),
             ]
             for (criterion, predicate) in cases
                 rows = LMFDBLite.search(conn, "nf_fields"; bounds..., parameter => criterion)

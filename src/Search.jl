@@ -20,6 +20,41 @@ struct Or
   b
 end
 
+"""
+    allof(condition, conditions...)
+
+Combine one or more search conditions for one parameter with logical AND,
+including nested `allof` and [`anyof`](@ref) expressions. Each
+condition is validated by the search parameter's builder; bare values mean equality.
+
+Return a single argument unchanged. Calling `allof()` raises `ArgumentError`.
+
+# Examples
+```julia
+LMFDBLite.search(conn, "nf_fields"; class_number = allof(>=(2), <=(5), in([2, 3, 4])))
+```
+"""
+allof(condition, conditions...) = foldl(And, conditions; init = condition)
+allof() = throw(ArgumentError("allof requires at least one condition"))
+
+"""
+    anyof(condition, conditions...)
+
+Combine one or more search conditions for one parameter with logical OR,
+including nested [`allof`](@ref) and `anyof` expressions. Each
+condition is validated by the search parameter's builder; bare values mean equality.
+
+Return a single argument unchanged. Calling `anyof()` raises `ArgumentError`.
+
+# Examples
+```julia
+LMFDBLite.search(conn, "nf_fields"; class_number = anyof(==(1), ==(2)))
+LMFDBLite.search(conn, "nf_fields"; signature = anyof((2, 0), (0, 1)))
+```
+"""
+anyof(condition, conditions...) = foldl(Or, conditions; init = condition)
+anyof() = throw(ArgumentError("anyof requires at least one condition"))
+
 ################################################################################
 #
 #  Formalizatin of restrictions
@@ -250,18 +285,18 @@ end
 # calling the builder, then verifies that its Condition uses only declared columns.
 # The declared input type describes the parameter; the builder performs conversion.
 #
-# The shared integer, integer-set, and signed-discriminant builders use two passes:
+# Integer, integer-set, signed-discriminant, and signature builders use two passes:
 #   1. _normalize_condition wraps bare values in equality, validates operators and
 #      resolves aliases, and converts operands throughout the input And/Or tree.
 #   2. _build_condition maps each normalized Fix2 predicate to a Condition. A leaf
-#      can expand into several column predicates (set equality or signed values).
+#      can expand into several column predicates (sets, signed values, signatures).
 # Normalization finishes first so an invalid branch is rejected even if another
 # branch makes the result constant. Operands remain Julia values until lowering.
 #
-# Other scalar transformations (__create_cond_trafo) and composite signatures have
-# their own builders, but produce the same Condition representation. Conditions.jl
-# translates it to FunSQL with create_fun; _create_where joins keyword conditions
-# with AND. No database connection is needed to normalize, build, or render a tree.
+# Other scalar transformations (__create_cond_trafo) have their own builders,
+# but produce the same Condition representation. Conditions.jl translates it to
+# FunSQL with create_fun; _create_where joins keyword conditions with AND.
+# No database connection is needed to normalize, build, or render a tree.
 #
 # When adding a parameter, declare every column it uses and choose a builder that
 # matches its semantics: integer sets ignore order and duplicates, while structured
@@ -467,25 +502,28 @@ _vec_to_string(v::Vector{<:Integer}) = "[" * join(v, ", ") * "]"
 _vec_to_sql_array(v::Vector{<:Integer}) = _stringify_list(v)
 
 function _create_number_field_signature_cond(columns, v, origin, allowed)
-  r1, r2 = _signature_values(v, origin, allowed)
-  return create_cond(columns[1], ==(r1 + 2r2)) & create_cond(columns[2], ==(r2))
+  normalized = _normalize_condition(v, origin, allowed, _normalize_signature_operand)
+  return _build_condition(normalized) do op
+    r1, r2 = op.x
+    # Keep both column restrictions together within each signature alternative.
+    return create_cond(columns[1], ==(r1 + 2r2)) & create_cond(columns[2], ==(r2))
+  end
 end
 
-function _signature_values(v, origin, allowed)
-  if v isa Base.Fix2
-    v.f in allowed || error("only the following allowed for `$origin`: $(join(allowed, " "))")
-    v = v.x
-  end
+function _normalize_signature_operand(op, v, origin)
   if !(v isa Union{Tuple, AbstractVector}) || length(v) != 2 ||
       !all(x -> x isa Integer && x >= 0, v) || all(iszero, v)
-    throw(ArgumentError("signature must be a pair of nonnegative integers with positive total"))
+    throw(ArgumentError("search parameter `$origin` requires a pair of nonnegative integers with positive total"))
   end
   return BigInt.(v)
 end
 
 function _create_lattice_signature_cond(columns, v, origin, allowed)
-  nplus, nminus = _signature_values(v, origin, allowed)
-  return create_cond(columns[1], ==(nplus + nminus)) & create_cond(columns[2], ==(nplus))
+  normalized = _normalize_condition(v, origin, allowed, _normalize_signature_operand)
+  return _build_condition(normalized) do op
+    nplus, nminus = op.x
+    return create_cond(columns[1], ==(nplus + nminus)) & create_cond(columns[2], ==(nplus))
+  end
 end
 
 function _scalar_parameter(T, sqltype, column, allowed = Any[==, <=, >=, >, <, in]; transform = T)
