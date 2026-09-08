@@ -46,12 +46,12 @@ jobs:
         with:
           version: '1.12'
       - uses: julia-actions/cache@v3
-      - name: Install PostgreSQL fixture tools
+      - name: Install PostgreSQL tools for the temporary test database
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql libpq-dev
           echo "LMFDB_POSTGRES_BIN=$(pg_config --bindir)" >> "$GITHUB_ENV"
-      - name: Run private PostgreSQL fixture
+      - name: Run tests against a temporary PostgreSQL database
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); include("test/metadata_postgresql.jl")'
 
   live:

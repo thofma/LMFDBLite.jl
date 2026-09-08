@@ -91,22 +91,24 @@ LMFDB_TEST_LIVE=true LMFDB_TEST_PUBLIC_DEFAULT=true julia --project=. -e 'using 
 The CI matrix starts at the minimum supported Julia version, 1.11. Each version
 runs both the core and Hecke tests through the normal `Pkg.test()` target.
 
-The metadata regression fixture creates a private temporary PostgreSQL cluster
-and tests unrelated unsupported types, same-named tables in different schemas,
+The metadata regression tests create a temporary PostgreSQL test database
+and check unrelated unsupported types, same-named tables in different schemas,
 an overridden `search_path`, quoted schema names, lazy caching, type mappings,
-and missing/mistyped search columns. It listens only on a Unix socket in its
-temporary directory and shuts down and removes the cluster afterwards. It does
-not use or modify the public mirror or the database selected by `LMFDB_*`.
+and missing/mistyped search columns. The database server listens only on a Unix
+socket in its temporary directory. The tests shut down the server and remove
+its data afterwards. They do not use or modify the public mirror or the database
+selected by `LMFDB_*`.
 
-To include this fixture in the full suite, set `LMFDB_POSTGRES_BIN` to a directory
-containing PostgreSQL's `initdb` and `pg_ctl`. You can also run it independently:
+To include the temporary database tests in the full suite, set
+`LMFDB_POSTGRES_BIN` to a directory containing PostgreSQL's `initdb` and `pg_ctl`.
+You can also run them independently:
 
 ```sh
 LMFDB_POSTGRES_BIN=/path/to/postgresql/bin julia --project=. test/metadata_postgresql.jl
 ```
 
-Without this setting, the fixture is not run. Type mapping tests always run;
-live metadata checks run only with `LMFDB_TEST_LIVE=true`.
+Without this setting, the temporary database tests are not run. Type mapping
+tests always run; live metadata checks run only with `LMFDB_TEST_LIVE=true`.
 
 Connection-string tests use libpq's parser without connecting and verify literal
 values for all constructor fields and TLS options, including whitespace, quotes,
