@@ -1,6 +1,6 @@
 module LMFDBLite
 
-export lmfdb, includes, reset!, allof, anyof
+export lmfdb, includes, reset!, allof, anyof, galois_group_labels
 
 using LibPQ
 using Tables
@@ -21,6 +21,7 @@ include("SearchParameters/NumberField.jl")
 include("SearchParameters/EllipticCurve.jl")
 include("SearchParameters/EllipticCurveNumberField.jl")
 include("Conditions.jl")
+include("GaloisGroup.jl")
 include("Lattice.jl")
 include("Genus.jl")
 include("NumberField.jl")

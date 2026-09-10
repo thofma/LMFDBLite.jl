@@ -18,10 +18,19 @@ function test_metadata_database(options)
             CREATE SCHEMA other;
             CREATE TABLE public.nf_fields (
                 label text, degree smallint, r2 smallint,
-                disc_abs numeric(30, 0), disc_sign smallint);
-            INSERT INTO public.nf_fields VALUES ('public-field', 2, 0, 5, 1);
-            CREATE TABLE other.nf_fields (label text, degree text, extra integer);
-            INSERT INTO other.nf_fields VALUES ('other-field', 'two', 99);
+                disc_abs numeric(30, 0), disc_sign smallint, galois_label text);
+            INSERT INTO public.nf_fields VALUES
+                ('public-field', 2, 0, 5, 1, '2T1'),
+                ('cyclic-cubic', 3, 0, 49, 1, '3T1'),
+                ('dihedral-quartic', 4, 0, 725, 1, '4T3'),
+                ('dihedral-octic', 8, 0, 999, 1, '8T4');
+            CREATE TABLE public.gps_transitive (label text, abstract_label text);
+            INSERT INTO public.gps_transitive VALUES
+                ('2T1', '2.1'), ('3T1', '3.1'),
+                ('4T3', '8.3'), ('8T4', '8.3');
+            CREATE TABLE other.nf_fields (
+                label text, degree text, extra integer, galois_label text);
+            INSERT INTO other.nf_fields VALUES ('other-field', 'two', 99, '2T1');
             CREATE TABLE public.unrelated (d date, u uuid, t timestamp with time zone);
             CREATE TABLE other.other_only (d date);
             CREATE TABLE public.mapping_types (c character(3), o oidvector, i int2vector);
@@ -37,7 +46,8 @@ function test_metadata_database(options)
         @test conn.schema == "public"
         @test only(ci.val for ci in LibPQ.conninfo(conn.conn.raw.conn) if ci.keyword == "sslmode") == "disable"
         @test isempty(conn.table_layouts)
-        @test Set(conn.table_names) == Set(["nf_fields", "unrelated", "mapping_types", "field_view"])
+        @test Set(conn.table_names) == Set(["nf_fields", "gps_transitive", "unrelated",
+                                            "mapping_types", "field_view"])
         @test length(conn.table_names) == length(unique(conn.table_names))
         @test all(table.qualifiers == [:public] for table in values(conn.conn.catalog))
 
@@ -55,6 +65,24 @@ function test_metadata_database(options)
         records = LMFDBLite.search(conn, "nf_fields"; degree = 2, signature = (2, 0), discriminant = 5)
         @test getproperty.(records, :label) == ["public-field"]
         @test LMFDBLite.count(conn, "nf_fields"; degree = 2) == 1
+        @test galois_group_labels(conn, "3t1") == ["3T1"]
+        @test galois_group_labels(conn, "C3") == ["3T1"]
+        @test galois_group_labels(conn, "[8,3]") == ["4T3", "8T4"]
+        @test galois_group_labels(conn, "8.3") == ["4T3", "8T4"]
+        @test galois_group_labels(conn, "C3, [8,3]") == ["3T1", "4T3", "8T4"]
+        @test haskey(conn.galois_group_cache, "C3")
+        @test Set(getproperty.(LMFDBLite.search(conn, "nf_fields";
+            galois_group = "C3"), :label)) == Set(["cyclic-cubic"])
+        @test Set(getproperty.(LMFDBLite.search(conn, "nf_fields";
+            galois_group = "[8,3]"), :label)) ==
+              Set(["dihedral-quartic", "dihedral-octic"])
+        @test Set(getproperty.(LMFDBLite.search(conn, "nf_fields";
+            galois_group = in(["C3", "[8,3]"])), :label)) ==
+              Set(["cyclic-cubic", "dihedral-quartic", "dihedral-octic"])
+        @test getproperty.(LMFDBLite.search(conn, "nf_fields";
+            degree = 4, galois_group = "[8,3]"), :label) == ["dihedral-quartic"]
+        @test isempty(galois_group_labels(conn, "99.99"))
+        @test_throws ArgumentError galois_group_labels(conn, "not-a-group")
         @test_throws r"requires missing column `nf_fields.class_number`" LMFDBLite.search(
             conn, "nf_fields"; class_number = 1)
         @test_throws ArgumentError LMFDBLite.check_table_name(conn, "other_only")
@@ -85,6 +113,10 @@ function test_metadata_database(options)
         @test Set(other.table_names) == Set(["nf_fields", "other_only"])
         @test isempty(other.table_layouts)
         @test getproperty.(LMFDBLite.search(other, "nf_fields"), :label) == ["other-field"]
+        @test getproperty.(LMFDBLite.search(other, "nf_fields";
+            galois_group = "2T1"), :label) == ["other-field"]
+        @test_throws r"requires table `gps_transitive`" LMFDBLite.search(
+            other, "nf_fields"; galois_group = "C2")
         @test Set(keys(other.table_layouts)) == Set([("other", "nf_fields")])
         @test_throws r"column `nf_fields.degree` has type .*text; expected .*smallint" LMFDBLite.search(
             other, "nf_fields"; degree = 2)

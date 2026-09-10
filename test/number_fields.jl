@@ -31,6 +31,19 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
             @test all(r -> -100 <= r.disc_sign * r.disc_abs <= 100, rows)
         end
 
+        @testset "LMFDB group codes" begin
+            cyclic = LMFDBLite.search(conn, "nf_fields";
+                galois_group = "C3", limit = 5)
+            @test !isempty(cyclic)
+            @test all(r -> r.galois_label == "3T1", cyclic)
+
+            dihedral = LMFDBLite.search(conn, "nf_fields";
+                galois_group = "[8,3]", limit = 5)
+            @test !isempty(dihedral)
+            @test all(r -> r.galois_label in ("4T3", "8T4"), dihedral)
+            @test LMFDBLite.galois_group_labels(conn, "8.3") == ["4T3", "8T4"]
+        end
+
         @testset "Combined number field parameters" begin
             parameters = (;
                 discriminant = in(-110:3300),

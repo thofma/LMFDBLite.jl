@@ -253,6 +253,7 @@ function _search_query(conn::LMFDBConnection, tname::String, apply_order::Bool =
     spec = parameter_definitions[parameter]
     _check_parameter_schema(layout, tname, parameter, spec)
     _, _, column, builder, allowed = spec
+    value = _resolve_search_parameter(conn, tname, parameter, value)
     # Builders receive physical column(s), the user value, its public parameter
     # name (for errors), and allowed operators. They return a Condition tree.
     cond = builder(column, value, parameter, allowed)
@@ -272,6 +273,11 @@ function _search_query(conn::LMFDBConnection, tname::String, apply_order::Bool =
   end
   return q
 end
+
+# Parameter values are normally ready for their pure condition builders. A small
+# number need connection-backed normalization first; methods live with the
+# corresponding parameter implementation.
+_resolve_search_parameter(conn, tname, parameter, value) = value
 
 """
     search(conn, table; limit = Inf, order_by = nothing, kw...)
