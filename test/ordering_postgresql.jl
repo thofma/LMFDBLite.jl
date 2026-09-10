@@ -50,6 +50,16 @@ function test_ordering_database(options)
             @test isempty(query(order_by = :degree, limit = 0))
             @test ids(query(order_by = :discriminant)) == [3, 1, 8, 4, 6, 9]
             @test ids(query(order_by = :discriminant => :desc)) == [6, 4, 8, 1, 3, 9]
+            @test ids(query(order_by = :absolute_discriminant)) == [4, 8, 6, 1, 3, 9]
+            @test ids(query(order_by = :absolute_discriminant => :desc)) == [3, 1, 6, 8, 4, 9]
+            @test ids(query(order_by = :absolute_discriminant, limit = 2)) == [4, 8]
+            @test ids(query(absolute_discriminant = 3)) == [8]
+            @test ids(query(absolute_discriminant = in(3:10), order_by = :absolute_discriminant)) == [8, 6, 1]
+            @test ids(query(absolute_discriminant = in([1, 10]), order_by = :absolute_discriminant)) == [4, 1]
+            @test ids(query(absolute_discriminant = allof(>=(3), <=(10)),
+                            discriminant = <(0), order_by = :absolute_discriminant)) == [8, 1]
+            @test isempty(query(absolute_discriminant = <(0)))
+            @test LMFDBLite.count_number_fields(conn; absolute_discriminant = <=(10)) == 4
             @test ids(query(order_by = :regulator)) == [4, 3, 6, 1, 8, 9]
             @test ids(query(order_by = :regulator => :desc)) == [6, 3, 4, 1, 8, 9]
             @test ids(query(order_by = :is_cm)) == [3, 6, 1, 4, 8, 9]
@@ -62,7 +72,8 @@ function test_ordering_database(options)
                      ("ec_nfcurves", (:conductor_norm, :rank => :desc), [2, 1, 3], LMFDBLite.count_elliptic_curves_over_number_fields),
                      ("lat_lattices_new", :disc, [1, 2], LMFDBLite.count_integer_lattices),
                      ("lat_genera", :det => :desc, [2, 1], LMFDBLite.count_genera),
-                     ("nf_fields", :discriminant, [3, 1, 8, 4, 6, 9], LMFDBLite.count_number_fields))
+                     ("nf_fields", :discriminant, [3, 1, 8, 4, 6, 9], LMFDBLite.count_number_fields),
+                     ("nf_fields", :absolute_discriminant, [4, 8, 6, 1, 3, 9], LMFDBLite.count_number_fields))
                 @test ids(LMFDBLite.search(conn, table; order_by = order)) == expected
                 @test count_function(conn; order_by = order, limit = 1) == 1
                 @test count_function(conn; order_by = order) == length(expected)

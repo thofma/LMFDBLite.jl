@@ -77,9 +77,9 @@ end
 function test_number_field_conditions(convert_value)
     @testset "Number field conditions: $(typeof(convert_value(0)))" begin
         reference = BigInt[-1, 0, 1, 2, 3, 4, 5]
-        for parameter in (:degree, :ramified_prime_count), (criterion, predicate) in integer_condition_cases(convert_value)
+        for parameter in (:degree, :ramified_prime_count, :absolute_discriminant), (criterion, predicate) in integer_condition_cases(convert_value)
             condition = number_field_condition(parameter, criterion)
-            actual = filter(d -> evaluate_number_field_condition(condition, (; degree = d, num_ram = d)), reference)
+            actual = filter(d -> evaluate_number_field_condition(condition, (; degree = d, num_ram = d, disc_abs = d)), reference)
             @test actual == filter(predicate, reference)
             @test occursin("WHERE", number_field_condition_sql(parameter, condition))
         end
@@ -97,10 +97,10 @@ end
 
 function test_number_field_integer_ranges(convert_value)
     @testset "Number field integer ranges: $(typeof(convert_value(0)))" begin
-        for parameter in (:degree, :ramified_prime_count), (lb, ub) in ((0, 3), (3, 2), (-3, 3))
+        for parameter in (:degree, :ramified_prime_count, :absolute_discriminant), (lb, ub) in ((0, 3), (3, 2), (-3, 3))
             condition = number_field_condition(parameter, in(convert_value(lb):convert_value(ub)))
             for d in -4:4
-                @test evaluate_number_field_condition(condition, (; degree = d, num_ram = d)) == (lb <= d <= ub)
+                @test evaluate_number_field_condition(condition, (; degree = d, num_ram = d, disc_abs = d)) == (lb <= d <= ub)
             end
             sql = number_field_condition_sql(parameter, condition)
             @test occursin(lb > ub ? "WHERE FALSE" : "BETWEEN", sql)
@@ -111,7 +111,7 @@ end
 function test_large_number_field_conditions(convert_value)
     @testset "Large number field operands: $(typeof(convert_value(0)))" begin
         value = big(2)^128 + 1
-        for parameter in (:degree, :ramified_prime_count), criterion in
+        for parameter in (:degree, :ramified_prime_count, :absolute_discriminant), criterion in
                 (identity, ==, <, <=, >, >=, x -> in([-x, x]), x -> in(-x:x))
             condition = number_field_condition(parameter, criterion(convert_value(value)))
             expected = number_field_condition(parameter, criterion(value))
@@ -139,7 +139,7 @@ end
     test_large_number_field_conditions(BigInt)
 
     @testset "Compact machine-integer ranges" begin
-        for parameter in (:degree, :ramified_prime_count), r in
+        for parameter in (:degree, :ramified_prime_count, :absolute_discriminant), r in
                 (0:10^9, typemin(Int):typemax(Int), 4:-1:0)
             condition = number_field_condition(parameter, in(r))
             sql = number_field_condition_sql(parameter, condition)
@@ -154,7 +154,7 @@ end
                           in(1:2:5), !=(2), LMFDBLite.includes([2]), issubset([2]))
         set_invalid = (nothing, [2, 1.5], ==(2), >([2, 3]), in([2, 3]),
                        LMFDBLite.includes([missing]), LMFDBLite.includes(2:3))
-        for parameter in (:degree, :ramified_prime_count, :ramified)
+        for parameter in (:degree, :ramified_prime_count, :absolute_discriminant, :ramified)
             invalid = parameter == :ramified ? set_invalid : scalar_invalid
             valid = parameter == :ramified ? LMFDBLite.includes(Int[]) : in(Int[])
             for bad in invalid, criterion in (bad, allof(valid, bad),
@@ -192,7 +192,8 @@ function test_live_number_field_conditions(conn)
         @test any(r -> isempty(r.ramps), reference)
         test_live_signature_composition(conn, "nf_fields", reference)
         for T in (Int, Hecke.ZZ)
-            for (parameter, column) in ((:degree, :degree), (:ramified_prime_count, :num_ram))
+            for (parameter, column) in ((:degree, :degree), (:ramified_prime_count, :num_ram),
+                                        (:absolute_discriminant, :disc_abs))
                 for (criterion, predicate) in integer_condition_cases(T)
                     rows = LMFDBLite.search(conn, "nf_fields"; bounds..., parameter => criterion)
                     @test labels(rows) == labels(filter(r -> predicate(BigInt(getproperty(r, column))), reference))

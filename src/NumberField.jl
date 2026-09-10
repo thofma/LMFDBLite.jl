@@ -14,7 +14,8 @@ Supported parameters include:
   `r1` counts real embeddings and `r2` counts pairs of complex embeddings.
   This constrains the degree to `r1 + 2r2` as well as the signature.
   Use `anyof((2, 0), (0, 1))` to accept either of two signatures.
-- `class_number`, `narrow_class_number`, `relative_class_number`, `index`:
+- `absolute_discriminant`, `class_number`, `narrow_class_number`,
+  `relative_class_number`, `index`:
   an integer, a comparison (`==`, `<`, `<=`, `>`, `>=`), or `in` with an
   integer vector or a range with step `1` or `-1`.
   Combine bounds with `allof`, e.g. `allof(>=(2), <=(10))`.
@@ -27,6 +28,10 @@ Supported parameters include:
 - `is_galois`, `is_cyclic`, `is_abelian`, `is_solvable`, `is_cm`,
   `is_minimal_sibling`: `true`, `false`, or an explicit equality.
 - `degree`, `discriminant`, `ramified`, `ramified_prime_count` are also available.
+
+`discriminant` uses the signed value, while `absolute_discriminant` uses its
+absolute value. Use `order_by = :absolute_discriminant` to return fields in
+increasing order of absolute discriminant before applying `limit`.
 
 Conditions for one parameter can be combined with `allof` (AND) and `anyof` (OR),
 including nested combinations. Each branch must use a supported operator and value.

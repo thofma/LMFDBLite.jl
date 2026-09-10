@@ -11,6 +11,7 @@ function _number_field_parameter_definitions()
     :narrow_class_group => _scalar_parameter(Vector{BigInt}, LMFDBLite.SQL.list{LMFDBLite.SQL.bigint}, :narrow_class_group, Any[==]; transform = _vec_to_sql_array),
     :relative_class_number => _scalar_parameter(BigInt, LMFDBLite.SQL.numeric, :relative_class_number),
     :discriminant => (BigInt, (LMFDBLite.SQL.numeric, LMFDBLite.SQL.smallint), (:disc_abs, :disc_sign), (k, v, orig, allowed) -> __create_cond_signed_split(v, k, k[1], k[2], orig, allowed), Any[==, <=, >=, >, <, in]),
+    :absolute_discriminant => _scalar_parameter(BigInt, LMFDBLite.SQL.numeric, :disc_abs),
     # Equality and membership compare the stored floating-point root discriminants exactly.
     :root_discriminant => _scalar_parameter(Float64, LMFDBLite.SQL.double, :rd, Any[==, <=, >=, >, <, in]),
     :galois_root_discriminant => _scalar_parameter(Float64, LMFDBLite.SQL.double, :grd, Any[==, <=, >=, >, <, in]),

@@ -63,7 +63,8 @@ end
                                       ("ec_nfcurves", :conductor_norm, "conductor_norm"),
                                       ("lat_lattices_new", :disc, "disc"),
                                       ("lat_genera", :det, "det"),
-                                      ("nf_fields", :is_cm, "cm"))
+                                      ("nf_fields", :is_cm, "cm"),
+                                      ("nf_fields", :absolute_discriminant, "disc_abs"))
         order = split(ordering_sql(table, parameter), "ORDER BY")[2]
         @test occursin("\"$column\" ASC NULLS LAST", order)
     end

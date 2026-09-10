@@ -98,7 +98,8 @@ matches before applying `limit`:
 
 ```julia
 LMFDBLite.search(conn, "nf_fields";
-    degree = 2, order_by = :discriminant, limit = 10)
+    degree = 2, absolute_discriminant = <=(1000),
+    order_by = :absolute_discriminant, limit = 10)
 
 LMFDBLite.elliptic_curves(conn;
     order_by = (:conductor => :asc, :rank => :desc), limit = 10)
@@ -108,8 +109,11 @@ A symbol means ascending order. Use `parameter => :asc` or `parameter => :desc`
 to specify a direction, and a tuple or vector of these to specify several keys
 in priority order. Keys are public search parameter names, including supported
 aliases. Sorting supports scalar numeric, text, and boolean parameters.
-Signed discriminants sort by their signed value. Arrays, signatures, and
-stored rational pairs such as genus `mass` are not supported as sort keys.
+Signed discriminants sort by their signed value. For number fields,
+`absolute_discriminant` supports filtering and ordering by the absolute value,
+with the same integer comparisons, membership, and ranges as `discriminant`.
+Arrays, signatures, and stored rational pairs such as genus `mass` are not
+supported as sort keys.
 Text follows the database's text ordering; labels are not sorted as numbers.
 Invalid keys, directions, or duplicate keys (including aliases) raise `ArgumentError`.
 
