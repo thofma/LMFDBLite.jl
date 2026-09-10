@@ -127,6 +127,8 @@ struct LMFDBConnection
   table_names::Vector{String}
   table_layouts::Dict{Tuple{String, String}, SQL.TableLayout}
   table_layout_lock::ReentrantLock
+  galois_group_cache::Dict{String, Vector{String}}
+  galois_group_cache_lock::ReentrantLock
 
   function LMFDBConnection(; host = "devmirror.lmfdb.xyz",
                    port = "5432",
@@ -154,7 +156,8 @@ struct LMFDBConnection
       tlayouts = Dict{Tuple{String, String}, SQL.TableLayout}()
       return new(conn, (;host, port, dbname, user, password, connect_timeout,
                         sslmode, sslrootcert, sslcert, sslkey), String(schema),
-                 tnames, tlayouts, ReentrantLock())
+                 tnames, tlayouts, ReentrantLock(), Dict{String, Vector{String}}(),
+                 ReentrantLock())
     catch
       DBInterface.close!(raw)
       rethrow()

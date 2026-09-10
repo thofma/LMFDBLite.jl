@@ -14,7 +14,9 @@ using Test
     @test includes === LMFDBLite.includes
     @test allof === LMFDBLite.allof
     @test anyof === LMFDBLite.anyof
-    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!, :allof, :anyof))
+    @test galois_group_labels === LMFDBLite.galois_group_labels
+    @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!,
+                                        :allof, :anyof, :galois_group_labels))
     @test reset! === LMFDBLite.reset!
     @test hasmethod(reset!, Tuple{LMFDBLite.LMFDBConnection})
     @test isempty(methods(LMFDBLite.number_fields))
@@ -37,6 +39,7 @@ if haskey(ENV, "LMFDB_POSTGRES_BIN")
 end
 include("discriminants.jl")
 include("number_field_conditions.jl")
+include("galois_groups.jl")
 include("composition.jl")
 include("integer_ranges.jl")
 

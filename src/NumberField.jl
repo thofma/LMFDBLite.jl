@@ -9,7 +9,10 @@ to `search`. The resulting objects preserve the requested order.
 Supported parameters include:
 
 - `label`, `galois_group`: a string, `==(value)`, or `in([values...])`.
-  Galois groups use transitive labels such as `"4T2"`.
+  Galois groups accept transitive labels such as `"4T2"`, GAP SmallGroup IDs
+  such as `"[8,3]"` or `"8.3"`, and familiar aliases such as `"C3"`.
+  Abstract groups and aliases expand to all transitive representations recorded
+  in `gps_transitive`.
 - `signature`: `(r1, r2)` or `[r1, r2]`, optionally wrapped in `==`, where
   `r1` counts real embeddings and `r2` counts pairs of complex embeddings.
   This constrains the degree to `r1 + 2r2` as well as the signature.

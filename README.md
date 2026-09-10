@@ -128,6 +128,18 @@ unspecified subset of the matches. Count functions accept and validate
 `order_by`, but omit sorting because it cannot change the count, including a
 capped count.
 
+## Galois groups of number fields
+
+Galois groups of number fields may be given by their transitive label, a GAP
+SmallGroup ID, or a familiar LMFDB alias. Abstract groups are expanded to every
+transitive representation:
+
+```julia
+LMFDBLite.search(conn, "nf_fields"; galois_group = "C3")
+LMFDBLite.search(conn, "nf_fields"; galois_group = "[8,3]")
+LMFDBLite.galois_group_labels(conn, "[8,3]") # ["4T3", "8T4"]
+```
+
 ## Hecke and Oscar integration
 
 LMFDBLite comes with an optional interface to directly construct native
