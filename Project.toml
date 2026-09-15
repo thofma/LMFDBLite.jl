@@ -1,6 +1,6 @@
 name = "LMFDBLite"
 uuid = "d66269b8-7907-4a75-8041-d35544a92097"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Tommy Hofmann <thofma@gmail.com>"]
 
 [deps]

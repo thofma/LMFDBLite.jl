@@ -1,6 +1,6 @@
 module LMFDBLite
 
-export lmfdb, includes, reset!, allof, anyof, galois_group_labels
+export lmfdb, includes, reset!, allof, anyof, number_fields, elliptic_curves, integer_lattices
 
 using LibPQ
 using Tables
