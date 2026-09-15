@@ -65,11 +65,12 @@ function test_metadata_database(options)
         records = LMFDBLite.search(conn, "nf_fields"; degree = 2, signature = (2, 0), discriminant = 5)
         @test getproperty.(records, :label) == ["public-field"]
         @test LMFDBLite.count(conn, "nf_fields"; degree = 2) == 1
-        @test galois_group_labels(conn, "3t1") == ["3T1"]
-        @test galois_group_labels(conn, "C3") == ["3T1"]
-        @test galois_group_labels(conn, "[8,3]") == ["4T3", "8T4"]
-        @test galois_group_labels(conn, "8.3") == ["4T3", "8T4"]
-        @test galois_group_labels(conn, "C3, [8,3]") == ["3T1", "4T3", "8T4"]
+        @test LMFDBLite.galois_group_labels(conn, "3t1") == ["3T1"]
+        @test LMFDBLite.galois_group_labels(conn, "C3") == ["3T1"]
+        @test LMFDBLite.galois_group_labels(conn, "[8,3]") == ["4T3", "8T4"]
+        @test LMFDBLite.galois_group_labels(conn, "8.3") == ["4T3", "8T4"]
+        @test LMFDBLite.galois_group_labels(conn, "C3, [8,3]") ==
+              ["3T1", "4T3", "8T4"]
         @test haskey(conn.galois_group_cache, "C3")
         @test Set(getproperty.(LMFDBLite.search(conn, "nf_fields";
             galois_group = "C3"), :label)) == Set(["cyclic-cubic"])
@@ -81,8 +82,8 @@ function test_metadata_database(options)
               Set(["cyclic-cubic", "dihedral-quartic", "dihedral-octic"])
         @test getproperty.(LMFDBLite.search(conn, "nf_fields";
             degree = 4, galois_group = "[8,3]"), :label) == ["dihedral-quartic"]
-        @test isempty(galois_group_labels(conn, "99.99"))
-        @test_throws ArgumentError galois_group_labels(conn, "not-a-group")
+        @test isempty(LMFDBLite.galois_group_labels(conn, "99.99"))
+        @test_throws ArgumentError LMFDBLite.galois_group_labels(conn, "not-a-group")
         @test_throws r"requires missing column `nf_fields.class_number`" LMFDBLite.search(
             conn, "nf_fields"; class_number = 1)
         @test_throws ArgumentError LMFDBLite.check_table_name(conn, "other_only")
