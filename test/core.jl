@@ -6,6 +6,9 @@ using Test
     @test Base.PkgId(LMFDBLite).name == "LMFDBLite"
     @test parentmodule(LMFDBLite.LMFDBConnection) === LMFDBLite
     @test Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt) === nothing
+    @test isdefined(LMFDBLite, :UI)
+    @test hasmethod(LMFDBLite.ui, Tuple{})
+    @test ui === LMFDBLite.ui
     @test !isdefined(LMFDBLite, :Hecke)
     @test !isdefined(LMFDBLite, :number_field)
     @test !isdefined(LMFDBLite, :elliptic_curve)
@@ -16,7 +19,7 @@ using Test
     @test anyof === LMFDBLite.anyof
     @test galois_group_labels === LMFDBLite.galois_group_labels
     @test Set(names(LMFDBLite)) == Set((:LMFDBLite, :includes, :lmfdb, :reset!,
-                                        :allof, :anyof, :galois_group_labels))
+                                        :allof, :anyof, :galois_group_labels, :ui))
     @test reset! === LMFDBLite.reset!
     @test hasmethod(reset!, Tuple{LMFDBLite.LMFDBConnection})
     @test isempty(methods(LMFDBLite.number_fields))

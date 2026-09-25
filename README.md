@@ -37,6 +37,48 @@ number of matches. The default `limit = Inf` counts every match. This also appli
 to `count_number_fields`, `count_elliptic_curves`,
 `count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and `count_genera`.
 
+## Interactive search
+
+The terminal interface uses [Tachikoma](https://github.com/kahliburke/Tachikoma.jl),
+which is installed and loaded automatically with LMFDBLite. Load Hecke (or Oscar)
+to construct the resulting fields:
+
+```julia
+using LMFDBLite, Hecke
+fields = ui()
+```
+
+<p align="center">
+  <img src="docs/assets/number-field-search.gif"
+       alt="Julia REPL demo of searching and browsing number fields with the LMFDB terminal UI"
+       width="770">
+</p>
+
+The **LMFDB** landing page lists the available object search pages. Use the
+arrow keys (or click) to select an item, then press Enter to open its search form.
+Currently, **Number fields** is available. **Back** or Escape returns to the
+landing page and preserves your filters. Escape on the landing page or Ctrl+C
+anywhere exits without searching and returns `nothing`.
+
+Fill any filters and press **Ctrl+S** or activate **Search**. Inputs are held
+fixed for that search. When it finishes, the interface reports how many fields
+were retrieved and offers **Browse** and **Return results to REPL**. Browse
+opens an in-terminal list with a view of the selected field. Escape returns to
+the completed form, and `R` returns all results from the browser. Returning
+restores the terminal and makes the original vector the value of `ui()`. No
+matches returns an empty vector. 
+
+Activate **Count** to return `count_number_fields(lmfdb(); ...)` instead.
+It uses the same filters and ignores Number of results, returning the total
+number of matches (zero if none). Count closes the interface before querying
+and returns the integer to the REPL.
+
+Tab/Shift-Tab moves between fields and buttons. Enter opens a selector or
+activates a button; Escape closes an open selector before leaving the form.
+Page Up/Page Down and the mouse wheel scroll the form, and Ctrl+U clears the
+focused text input. The form uses three columns in terminals at least 110
+characters wide, two columns from 80 characters, and one column in smaller windows.
+
 ## Supported tables
 
 At the moment, the following tables are supported, where "experimental" refers to experimental tables in the LMFDB itself:

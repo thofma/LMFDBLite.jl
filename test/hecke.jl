@@ -1,5 +1,7 @@
 using Hecke
 
+@test LMFDBLite.UI.require_number_fields() === nothing
+
 include("elliptic_curve_number_field_conversion.jl")
 
 @testset "Hecke extension" begin
