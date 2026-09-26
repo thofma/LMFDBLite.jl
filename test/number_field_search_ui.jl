@@ -1,4 +1,4 @@
-using Tachikoma
+import Tachikoma
 const NFUI = LMFDBLite.UI
 
 # Test predicate behavior independently of the form's degree/signature check.
@@ -38,6 +38,7 @@ end
 
 @testset "Number-field form without Hecke" begin
     @test NFUI !== nothing
+    @test reset! === LMFDBLite.reset!
     @test Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt) === nothing
     @test_throws ArgumentError ui()
     @test LMFDBLite._lmfdb_cache[] === nothing
