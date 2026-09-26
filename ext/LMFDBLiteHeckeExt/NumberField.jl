@@ -5,6 +5,9 @@ function _number_field_from_record(record::NamedTuple)
   return K
 end
 
+LMFDBLite._number_fields_from_rows(records::AbstractVector{<:NamedTuple}) =
+  _number_field_from_record.(records)
+
 """
     number_field(conn::LMFDBConnection, label::String)
 
@@ -20,5 +23,5 @@ end
 
 function LMFDBLite.number_fields(conn::LMFDBLite.LMFDBConnection; limit = Inf, kw...)
   records = LMFDBLite.search(conn, "nf_fields"; limit, kw...)
-  return _number_field_from_record.(records)
+  return LMFDBLite._number_fields_from_rows(records)
 end

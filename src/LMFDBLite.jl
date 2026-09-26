@@ -1,6 +1,6 @@
 module LMFDBLite
 
-export lmfdb, includes, reset!, allof, anyof, number_fields, elliptic_curves, integer_lattices
+export lmfdb, includes, reset!, allof, anyof, number_fields, elliptic_curves, integer_lattices, ui
 
 using LibPQ
 using Tables
@@ -8,6 +8,7 @@ using DBInterface
 using FunSQL
 using LibPQ.Decimals
 
+import Tryparse
 import FunSQL: Where, Get, From, Fun, Select, Order, SQLTable, Limit, Agg, Group
 
 include("Types.jl")
@@ -26,6 +27,7 @@ include("Lattice.jl")
 include("Genus.jl")
 include("NumberField.jl")
 include("EllipticCurve.jl")
+include("UI.jl")
 
 const _lmfdb_lock = ReentrantLock()
 const _lmfdb_cache = Ref{Union{Nothing, LMFDBConnection}}(nothing)

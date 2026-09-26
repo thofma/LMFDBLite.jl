@@ -1,4 +1,21 @@
 function test_number_fields(conn::LMFDBLite.LMFDBConnection)
+    @testset "Number-field form submission" begin
+        ui = LMFDBLite.UI
+        fields = ui.run_ui(; connect = () -> conn, runner = m -> begin
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+            Tachikoma.set_text!(m.number_fields.widgets[:degree], "2")
+            Tachikoma.set_text!(m.number_fields.widgets[:discriminant], "5")
+            Tachikoma.set_text!(m.number_fields.widgets[:limit], "1")
+            ui.focus!(m.number_fields, :search)
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+            ui_receive_task!(m)
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:right))
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+        end)
+        @test length(fields) == 1
+        @test Hecke.get_attribute(only(fields), :lmfdb_label) == "2.2.5.1"
+        @test isopen(conn)
+    end
     signed_bounds = (; label = in(["2.0.8.1", "2.0.7.1", "2.0.4.1", "2.0.3.1", "2.2.5.1", "2.2.8.1"]))
     signed_reference = LMFDBLite.search(conn, "nf_fields"; signed_bounds...)
     test_live_discriminants(conn, "nf_fields", signed_reference; signed_bounds...)

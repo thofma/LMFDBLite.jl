@@ -37,6 +37,23 @@ number of matches. The default `limit = Inf` counts every match. This also appli
 to `count_number_fields`, `count_elliptic_curves`,
 `count_elliptic_curves_over_number_fields`, `count_integer_lattices`, and `count_genera`.
 
+## Interactive search
+
+The terminal interface uses [Tachikoma](https://github.com/kahliburke/Tachikoma.jl),
+which is installed and loaded automatically with LMFDBLite. Load Hecke (or Oscar)
+to construct the resulting fields:
+
+```julia
+using LMFDBLite, Hecke
+fields = ui()
+```
+
+<p align="center">
+  <img src="docs/assets/number-field-search.gif"
+       alt="Julia REPL demo of searching and browsing number fields with the LMFDB terminal UI"
+       width="770">
+</p>
+
 ## Supported tables
 
 At the moment, the following tables are supported, where "experimental" refers to experimental tables in the LMFDB itself:

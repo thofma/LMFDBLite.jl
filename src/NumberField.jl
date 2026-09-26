@@ -53,6 +53,10 @@ LMFDBLite.number_fields(conn; signature = (2, 0), class_number = 1,
 """
 function number_fields end
 
+# Implemented by the Hecke extension. The UI keeps raw rows for browsing and
+# materializes them only after the terminal has been restored.
+function _number_fields_from_rows end
+
 """
     count_number_fields(conn::LMFDBConnection; limit = Inf, kw...)
 

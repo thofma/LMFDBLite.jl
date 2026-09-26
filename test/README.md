@@ -1,6 +1,7 @@
 The default suite runs without a database connection. `core.jl` checks the raw
-query core; `hecke.jl` then checks the optional extension. Dependency installation
-may require network access, but the tests themselves do not contact PostgreSQL.
+query core; the Tachikoma form tests check the built-in UI, and `hecke.jl` checks
+the optional Hecke extension. Dependency installation may require network access,
+but the tests themselves do not contact PostgreSQL.
 CI runs these offline tests separately from local PostgreSQL and public-mirror
 integration jobs.
 
@@ -9,7 +10,26 @@ lazily, returns the same object across calls and tasks, invalidates the cache
 when closed, and reconstructs it on demand. Type-specific count functions are
 checked against their corresponding raw searches.
 
-The test runner first checks that LMFDBLite loads without Hecke, then loads Hecke
+The test runner first checks that loading LMFDBLite makes `ui()` available
+without explicitly loading Tachikoma, while Hecke remains unloaded. It then
+runs offline parsing, form interaction, and submission tests.
+Integer parsing tests cover Tryparse expressions, power-based bounds such as
+`0..2^5`, signed power expressions, exact large literals, compact
+BigInt ranges, and malformed expressions.
+Headless tests exercise the LMFDB landing page, selection with Enter, returning
+to the menu while preserving filters, wide/narrow layouts, resizing, focus,
+selectors, validation, reset, cancellation, and mouse actions. Submission tests use private test doubles
+to verify that connection acquisition and search happen exactly once in a
+background task while the form and spinner remain visible. They exercise success,
+failure, empty results, raw-row browsing, conversion after terminal restoration,
+detail scrolling, and keyboard and mouse return actions. Pure form tests
+also check Count dispatch, total counts independent of the result limit, zero
+matches, and invalid filters without opening a connection. These tests
+do not require Hecke; the public launcher explains that Hecke or Oscar must be loaded.
+The opt-in number-field live tests submit a bounded quadratic-field search using
+the integration suite's connection and check the returned Hecke field.
+
+The runner then loads Hecke
 to activate `LMFDBLiteHeckeExt` and test conversion to number fields, elliptic
 curves, integer lattices, and genera. Hecke is a test dependency and an optional
 dependency of LMFDBLite. In a user session, load both packages with

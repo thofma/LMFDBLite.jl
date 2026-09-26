@@ -1,6 +1,7 @@
 # The default suite never opens a database connection. Integration checks are
 # separate opt-ins; connection overrides alone do not enable network access.
 include("core.jl")
+include("number_field_search_ui.jl")
 include("hecke.jl")
 
 if get(ENV, "LMFDB_TEST_LIVE", "false") == "true"

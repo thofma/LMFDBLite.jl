@@ -1,5 +1,7 @@
 using Hecke
 
+@test LMFDBLite.UI.require_number_fields() === nothing
+
 include("elliptic_curve_number_field_conversion.jl")
 
 @testset "Hecke extension" begin
@@ -13,6 +15,16 @@ include("elliptic_curve_number_field_conversion.jl")
     @test hasmethod(LMFDBLite.number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.elliptic_curves_over_number_fields, Tuple{LMFDBLite.LMFDBConnection})
     @test hasmethod(LMFDBLite.integer_lattice, Tuple{LMFDBLite.LMFDBConnection, String})
+
+    rows = [
+        (; label = "2.2.5.1", coeffs = BigInt[-1, -1, 1]),
+        (; label = "2.2.8.1", coeffs = BigInt[-2, 0, 1]),
+    ]
+    fields = LMFDBLite._number_fields_from_rows(rows)
+    @test fields isa Vector{Hecke.AbsSimpleNumField}
+    @test Hecke.get_attribute.(fields, :lmfdb_label) == getproperty.(rows, :label)
+    @test Hecke.defining_polynomial.(fields) ==
+          map(row -> Hecke.Globals.Qx(BigInt.(row.coeffs)), rows)
 end
 
 # ZZRingElem is also Oscar's integer type; these tests need no database.
