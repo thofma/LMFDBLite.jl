@@ -21,7 +21,8 @@ to the menu while preserving filters, wide/narrow layouts, resizing, focus,
 selectors, validation, reset, cancellation, and mouse actions. Submission tests use private test doubles
 to verify that connection acquisition and search happen exactly once in a
 background task while the form and spinner remain visible. They exercise success,
-failure, empty results, browsing, and keyboard and mouse return actions. Pure form tests
+failure, empty results, raw-row browsing, conversion after terminal restoration,
+detail scrolling, and keyboard and mouse return actions. Pure form tests
 also check Count dispatch, total counts independent of the result limit, zero
 matches, and invalid filters without opening a connection. These tests
 do not require Hecke; the public launcher explains that Hecke or Oscar must be loaded.

@@ -246,12 +246,33 @@ end
     end
 end
 
-@testset "Search runs in the UI and returns results after selection" begin
+@testset "Search browses rows and converts them after selection" begin
     events = Symbol[]
     connection = Ref(:connection)
-    returned = [Ref(:first), Ref(:second)]
+    rows = [
+        (; label = "2.2.5.1", coeffs = BigInt[-1, -1, 1], disc_sign = 1,
+           disc_abs = big(5), degree = 2, r2 = 0),
+        (; label = "2.2.8.1", coeffs = BigInt[-2, 0, 1], disc_sign = 1,
+           disc_abs = big(8), degree = 2, r2 = 0, rd = sqrt(8), grd = sqrt(8),
+           disc_rad = big(2), galois_label = "2T1", is_galois = true,
+           gal_is_abelian = true, gal_is_cyclic = true, gal_is_solvable = true,
+           class_number = big(1), class_group = "[]", narrow_class_number = 1,
+           narrow_class_group = Int[], relative_class_number = missing,
+           regulator = 0.881373587, ramps = BigInt[2], num_ram = 1,
+           conductor = big(8), index = 1, monogenic = 1, cm = false,
+           is_minimal_sibling = true, minimal_sibling = missing,
+           unit_signature_rank = 2, torsion_order = 2, subfields = "{}",
+           subfield_mults = Int[], local_algs = "{2.1.2.2a}",
+           inessentialp = Int[], galois_disc_exponents = BigInt[3],
+           maximal_cm_subfield = missing, embeddings_gen_real = missing,
+           embeddings_gen_imag = missing, used_grh = false),
+    ]
+    converted = [Ref(:first), Ref(:second)]
+    @test NFUI.polynomial_text(BigInt[-1, -1, 1]) == "x^2 - x - 1"
+    @test NFUI.polynomial_text(BigInt[1, -2, 3]) == "3*x^2 - 2*x + 1"
     started = Channel{Nothing}(1)
     release = Channel{Nothing}(1)
+    never = (args...; kw...) -> error("must not run")
     runner = function(m)
         push!(events, :open)
         @test m.page == :home
@@ -271,7 +292,7 @@ end
         put!(release, nothing)
         event = ui_receive_task!(m)
         @test event.id == :number_field_search
-        @test m.search_state == :complete && m.results === returned && !m.quit
+        @test m.search_state == :complete && m.results === rows && !m.quit
         tb = Tachikoma.TestBackend(120, 40)
         NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 120, 40), tb.buf)
         @test Tachikoma.find_text(tb, "Search complete. 2 fields retrieved") !== nothing
@@ -283,12 +304,34 @@ end
         tb = Tachikoma.TestBackend(120, 40)
         NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 120, 40), tb.buf)
         @test Tachikoma.find_text(tb, "Number fields — 2 results") !== nothing
-        @test Tachikoma.find_text(tb, "Ref") !== nothing
+        @test Tachikoma.find_text(tb, "2.2.5.1") !== nothing
+        @test Tachikoma.find_text(tb, "x^2 - x - 1") !== nothing
         Tachikoma.update!(m, Tachikoma.KeyEvent(:down))
         @test Tachikoma.value(m.result_list) == 2
         tb = Tachikoma.TestBackend(120, 40)
         NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 120, 40), tb.buf)
-        @test Tachikoma.find_text(tb, "second") !== nothing
+        @test Tachikoma.find_text(tb, "2.2.8.1") !== nothing
+        @test Tachikoma.find_text(tb, "Defining polynomial:") !== nothing
+        @test Tachikoma.find_text(tb, "Degree:") !== nothing
+        @test Tachikoma.find_text(tb, "Discriminant:") !== nothing
+        @test Tachikoma.find_text(tb, "Signature:") !== nothing
+        detail = NFUI.number_field_row_detail(rows[2])
+        @test occursin(NFUI.detail_line("Galois group", "2T1"), detail)
+        @test occursin(NFUI.detail_line("Class group", "[]"), detail)
+        @test occursin(NFUI.detail_line("Ramified primes", "[2]"), detail)
+        @test occursin(NFUI.detail_line("Monogenic", "yes"), detail)
+        @test occursin(NFUI.detail_line("GRH used", "no"), detail)
+        @test !occursin("missing", detail)
+        tb = Tachikoma.TestBackend(120, 18)
+        NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 120, 18), tb.buf)
+        @test Tachikoma.find_text(tb, "PgUp/PgDn: details") !== nothing
+        for _ in 1:3
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:pagedown))
+        end
+        @test Tachikoma.value(m.result_list) == 2
+        tb = Tachikoma.TestBackend(120, 18)
+        NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 120, 18), tb.buf)
+        @test Tachikoma.find_text(tb, "GRH used:") !== nothing
         Tachikoma.update!(m, Tachikoma.KeyEvent(:escape))
         @test m.page == :number_fields && m.search_state == :complete
         Tachikoma.update!(m, Tachikoma.KeyEvent(:right))
@@ -303,10 +346,15 @@ end
         @test (; kw...) == (; degree = big(2), limit = 1)
         put!(started, nothing)
         take!(release)
-        return returned
+        return rows
     end
-    @test NFUI.run_ui(; runner, connect, execute) === returned
-    @test events == [:open, :connect, :execute, :restored]
+    convert_results = function(actual)
+        push!(events, :convert)
+        @test actual === rows
+        return converted
+    end
+    @test NFUI.run_ui(; runner, connect, execute, convert_results) === converted
+    @test events == [:open, :connect, :execute, :restored, :convert]
 
     empty_runner = function(m)
         Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
@@ -321,9 +369,15 @@ end
             Tachikoma.mouse_press, false, false, false))
         @test m.quit && m.return_to_repl
     end
-    empty = Any[]
+    empty_rows = NamedTuple[]
+    empty_fields = Any[]
+    convert_empty = function(actual)
+        @test actual === empty_rows
+        return empty_fields
+    end
     @test NFUI.run_ui(; runner = empty_runner, connect = () -> :connection,
-                       execute = (c; kw...) -> empty) === empty
+                       execute = (c; kw...) -> empty_rows,
+                       convert_results = convert_empty) === empty_fields
 
     failed_runner = function(m)
         Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
@@ -337,19 +391,22 @@ end
         Tachikoma.update!(m, Tachikoma.KeyEvent(:ctrl_c))
     end
     @test NFUI.run_ui(; runner = failed_runner, connect = () -> :connection,
-                       execute = (c; kw...) -> error("query failed")) === nothing
+                       execute = (c; kw...) -> error("query failed"),
+                       convert_results = never) === nothing
 
-    never = (args...; kw...) -> error("must not run")
-    @test NFUI.run_ui(; runner = m -> nothing, connect = never, execute = never) === nothing
+    @test NFUI.run_ui(; runner = m -> nothing, connect = never, execute = never,
+                       convert_results = never) === nothing
     @test NFUI.run_ui(; runner = m -> Tachikoma.update!(m, Tachikoma.KeyEvent(:escape)),
-                               connect = never, execute = never) === nothing
+                               connect = never, execute = never,
+                               convert_results = never) === nothing
     invalid = function(m)
         Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
         ui_fill!(m.number_fields, (; degree = "oops"))
         Tachikoma.update!(m, Tachikoma.KeyEvent(:ctrl, 's'))
         @test m.page == :number_fields && !m.quit && m.search_state == :editing
     end
-    @test NFUI.run_ui(; runner = invalid, connect = never, execute = never) === nothing
+    @test NFUI.run_ui(; runner = invalid, connect = never, execute = never,
+                       convert_results = never) === nothing
     @test_throws ErrorException NFUI.run_ui(; runner = m -> error("terminal failed"), connect = never)
     @test LMFDBLite._lmfdb_cache[] === nothing
 end

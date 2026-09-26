@@ -8,15 +8,17 @@ revisions of 2026-09-25. Repository baseline: `e60263e`.
 Build a Tachikoma terminal form that collects number-field search conditions,
 validates them locally, then returns the result of
 **`LMFDBLite.number_fields(LMFDBLite.lmfdb(); filters...)`** when submitted.
-Search returns the actual vector of number-field objects; Count returns the
-integer from `LMFDBLite.count_number_fields(LMFDBLite.lmfdb(); filters...)`.
-Search runs in a background task while the form remains visible. On completion,
-the interface can browse the retrieved vector or return that exact vector to the
-REPL. Pagination, sorting controls, and other mathematical objects are outside
-this step. Count still closes the interface before it runs.
+Search obtains raw `nf_fields` rows in a background task while the form remains
+visible. On completion, the interface browses those rows. If the user returns
+the results to the REPL, it converts the retained rows to number fields after
+the terminal is restored, without repeating the query. Count returns the integer
+from `LMFDBLite.count_number_fields(LMFDBLite.lmfdb(); filters...)`. Pagination,
+sorting controls, and other mathematical objects are outside this step. Count
+still closes the interface before it runs.
 
-Reuse the existing cached default connection through `lmfdb()` and the existing
-plural `number_fields` and `count_number_fields` methods; no new backend is needed.
+Reuse the existing cached default connection through `lmfdb()`, the raw `search`
+backend, and the conversion logic shared with `number_fields`; use the existing
+`count_number_fields` method for Count.
 
 Follow the labels, examples, and relative field order of the homepage's Search
 section. This first form exposes the filters the current Julia API can express;
@@ -44,13 +46,14 @@ annotation that introduces a hard dependency on Hecke.
   click select an object; Enter opens its search page.
 - The number-field form is initially blank, except for the result limit below.
 - **Search** validates all entries. On success, capture typed keyword values and
-  execute `LMFDBLite.number_fields(LMFDBLite.lmfdb(); filters...)` exactly once
+  execute `LMFDBLite.search(LMFDBLite.lmfdb(), "nf_fields"; filters...)` exactly once
   in a Tachikoma background task. Keep the form and its submitted parameters
   visible and show a spinner in the status area below the fields while it runs.
 - On success, show **Search complete. N field(s) retrieved** below the parameters
-  and offer **Browse** and **Return results to REPL**. Browse shows the retrieved
-  fields in the terminal and allows returning to the completed form. Returning
-  to the REPL closes the interface and returns the original result vector unchanged.
+  and offer **Browse** and **Return results to REPL**. Browse shows the retained
+  rows as labels and polynomials, with a scrollable detail pane for the available
+  field invariants, and allows returning to the completed form. Returning to the REPL closes the interface, converts
+  exactly those rows to number fields, and returns the resulting vector.
 - **Count** validates the filters, ignoring the result-limit input, then closes
   the interface and calls `LMFDBLite.count_number_fields(LMFDBLite.lmfdb(); filters...)`
   exactly once. Return the total count unchanged; omit `limit` so it is uncapped.
@@ -63,9 +66,10 @@ annotation that introduces a hard dependency on Hecke.
 - Leave REPL display to Julia's normal display of the returned value. Do not
   print source, manually print the returned vector, or wrap it in a new result type.
 - Return an empty vector for Search or zero for Count when no fields match, preserving the distinction from
-  cancellation. Show connection, query, alias-resolution, and conversion failures
-  in the status area with the parameters still available for editing and retry.
-  Do not turn failures into an empty result or retry automatically.
+  cancellation. Show connection, query, and alias-resolution failures in the
+  status area with the parameters still available for editing and retry. A field
+  conversion failure propagates at the REPL after terminal restoration. Do not
+  turn failures into an empty result or retry automatically.
 - Keep parsing and keyword construction as pure functions for testing.
 
 For example, submitting these values must have the same effect and return
@@ -156,7 +160,7 @@ appear here: they are not separate inputs in the homepage Search form.
 Keep this layer independent of Tachikoma events, databases, and Hecke. Parse
 into typed Julia values and predicates accepted by the existing API, collected
 in a named tuple or ordered keyword pairs. Pass these directly to
-`number_fields` using keyword splatting. Parse integer arithmetic with Tryparse;
+`search` using keyword splatting. Parse integer arithmetic with Tryparse;
 do not use `eval` or execute arbitrary Julia code.
 
 Supported numeric syntax:
@@ -201,7 +205,8 @@ Additional rules:
 - Keep keyword construction deterministic in field-specification order, with
   `limit` last. Use the existing `LMFDBLite.includes`, `LMFDBLite.allof`, and
   `LMFDBLite.anyof` constructors. All-blank filters with blank limit execute
-  `LMFDBLite.number_fields(LMFDBLite.lmfdb())` with no keyword restrictions.
+  an unrestricted raw search and convert those rows only if they are returned
+  to the REPL, which is equivalent to `LMFDBLite.number_fields(LMFDBLite.lmfdb())`.
 
 ## 5. Package and UI architecture
 
@@ -228,7 +233,8 @@ Tachikoma UUID: `468859d6-42d8-48b7-8ad9-1d312e0e3b0a`. Version 2.6.1 is
 installed locally; upstream main inspected here declares 2.7.0. Start with
 compat `Tachikoma = "2.6.1"` and verify on that minimum version before relying
 on newer APIs. Preserve the package's Julia 1.11 minimum. Do not modify
-`Search.jl`, the SQL condition builders, or the Hecke extension for this UI.
+`Search.jl` or the SQL condition builders for this UI. Add a small Hecke
+extension helper that converts an already retrieved row vector.
 
 Use Tachikoma's `Model`, `update!`, `view`, `TextInput`, `DropDown`, `Button`,
 `Block`, `StatusBar`, and focus utilities. Use persistent widget instances;
@@ -237,11 +243,12 @@ selection and number-field form, routing events to the active page and preservin
 filters when going back. Track submission as validated keyword values in the
 model, distinct from navigation or cancellation. The root model owns a
 `TaskQueue`; Search uses `spawn_task!` and handles its `TaskEvent` on the app
-thread. The public entry point uses the real `lmfdb()` and `number_fields`
-functions; private orchestration helpers may accept test doubles for the app
-runner and search executor. Keep blocking database work out of `update!` and
-`view`, and preserve Tachikoma's terminal cleanup on exit. Count retains its
-existing post-app execution so the terminal is restored before it queries.
+thread. The public entry point uses the real `lmfdb()` and raw `search`
+functions in the background, then the Hecke extension's row converter after UI
+exit. Private orchestration helpers may accept test doubles for the app runner,
+search executor, and converter. Keep blocking database work out of `update!`
+and `view`, and preserve Tachikoma's terminal cleanup on exit. Count retains
+its existing post-app execution so the terminal is restored before it queries.
 
 Layout and interaction:
 
@@ -254,6 +261,8 @@ Layout and interaction:
 - Reserve space below the fields for search progress, completion choices, and
   errors. Ignore form edits while a search is active so the visible parameters
   continue to describe the running query.
+- In the result browser, keep Up/Down for selecting rows and use Page Up/Page
+  Down or the mouse wheel to scroll the selected row's invariant details.
 - At 80×24 every input and action must remain reachable. Support resizing
   without losing values. Extremely small terminals may show a resize hint.
 - Show examples and validation errors near the focused field. Expanded
@@ -288,8 +297,9 @@ alone are enough for this first version.
    cancelled state directly through model events.
 4. **Connect submission to search or count.** Add the Hecke-extension availability check
    before launching. For Search, obtain the cached connection and call
-   `number_fields` in the model's background task; after completion, let the user
-   browse or return the exact vector. For Count, close the app before obtaining
+   raw `search` in the model's background task; after completion, let the user
+   browse the retained rows or convert those rows after returning to the REPL.
+   For Count, close the app before obtaining
    the connection and calling `count_number_fields`. Use test doubles to verify
    ordering and exactly one execution, plus no connection or execution on
    cancellation or invalid input. Never
@@ -322,8 +332,9 @@ Meaningful test coverage:
 - Verify typed keyword values and predicate behavior against independent
   expected cases. Test the executor receives these exact keywords and the
   default connection; no source parsing or evaluation is needed.
-- Verify the launcher returns the selected executor's vector or integer unchanged,
-  including an empty vector or zero, while cancellation returns `nothing`.
+- Verify the launcher converts the selected executor's rows only after terminal
+  restoration and returns that vector or the Count integer, including an empty
+  vector or zero, while cancellation returns `nothing`.
   Count must omit the result limit, preserve filters, and skip field construction.
   Search errors must appear in the form and permit retry; cancellation before
   submission skips connection acquisition, and the launcher does not manually
@@ -332,7 +343,7 @@ Meaningful test coverage:
   cancellation, invalid submission, async completion, Browse, and rendering at
   120×40 and 80×24. Verify the spinner and completion controls share the form
   with the submitted parameters, and that keyboard and mouse return actions
-  preserve the exact result vector. Verify the last field and action buttons
+  preserve the exact retained rows until conversion. Verify the last field and action buttons
   remain reachable after resizing.
 - Exercise pure parsing and form events without Hecke loaded, and test the
   public launcher's helpful missing-Hecke error before terminal startup.

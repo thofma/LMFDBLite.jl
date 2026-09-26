@@ -1,6 +1,9 @@
 # Only implemented search pages belong in this menu.
 const SEARCH_PAGES = [:number_fields => "Number fields"]
 
+search_number_field_rows(conn; filters...) =
+    LMFDBLite.search(conn, "nf_fields"; filters...)
+
 mutable struct SearchUI <: T.Model
     quit::Bool
     page::Symbol
@@ -18,17 +21,18 @@ mutable struct SearchUI <: T.Model
     return_button::T.Button
     completion_hits::Dict{Symbol,T.Rect}
     result_list::Union{Nothing,T.SelectableList}
+    result_detail::Union{Nothing,T.ScrollPane}
     return_to_repl::Bool
     connect::Any
     execute::Any
 end
 
-function SearchUI(; connect = LMFDBLite.lmfdb, execute = LMFDBLite.number_fields)
+function SearchUI(; connect = LMFDBLite.lmfdb, execute = search_number_field_rows)
     return SearchUI(false, :home,
         T.SelectableList(last.(SEARCH_PAGES); focused = true), NumberFieldForm(),
         nothing, :search, T.TaskQueue(), :editing, nothing, nothing, 0, 1,
         T.Button("Browse"), T.Button("Return results to REPL"),
-        Dict{Symbol,T.Rect}(), nothing, false, connect, execute)
+        Dict{Symbol,T.Rect}(), nothing, nothing, false, connect, execute)
 end
 
 T.should_quit(m::SearchUI) = m.quit
@@ -48,7 +52,124 @@ function open_selected_page!(m::SearchUI)
     return nothing
 end
 
+const NUMBER_FIELD_ROW_PROPERTIES =
+    (:label, :coeffs, :disc_sign, :disc_abs, :degree, :r2)
+
+is_number_field_row(result) =
+    all(property -> hasproperty(result, property), NUMBER_FIELD_ROW_PROPERTIES)
+
+function polynomial_text(coefficients)
+    terms = Tuple{Bool,String}[]
+    for (degree, coefficient) in Iterators.reverse(enumerate(coefficients))
+        value = BigInt(coefficient)
+        iszero(value) && continue
+        power = degree - 1
+        magnitude = abs(value)
+        monomial = power == 0 ? string(magnitude) :
+                   power == 1 ? "x" : "x^$power"
+        term = power > 0 && magnitude != 1 ? "$(magnitude)*$monomial" : monomial
+        push!(terms, (value < 0, term))
+    end
+    isempty(terms) && return "0"
+    negative, first_term = first(terms)
+    result = negative ? "-$first_term" : first_term
+    for (negative, term) in @view terms[2:end]
+        result *= negative ? " - $term" : " + $term"
+    end
+    return result
+end
+
+function number_field_row_summary(row)
+    return "$(row.label)  $(polynomial_text(row.coeffs))"
+end
+
+const NUMBER_FIELD_BOOLEAN_DETAILS =
+    (:is_galois, :gal_is_abelian, :gal_is_cyclic, :gal_is_solvable,
+     :cm, :is_minimal_sibling, :used_grh)
+
+const NUMBER_FIELD_DETAIL_FIELDS = (
+    (:rd, "Root discriminant"),
+    (:grd, "Galois root discriminant"),
+    (:disc_rad, "Discriminant radical"),
+    (:galois_label, "Galois group"),
+    (:is_galois, "Galois"),
+    (:gal_is_abelian, "Abelian"),
+    (:gal_is_cyclic, "Cyclic"),
+    (:gal_is_solvable, "Solvable"),
+    (:class_number, "Class number"),
+    (:class_group, "Class group"),
+    (:narrow_class_number, "Narrow class number"),
+    (:narrow_class_group, "Narrow class group"),
+    (:relative_class_number, "Relative class number"),
+    (:regulator, "Regulator"),
+    (:ramps, "Ramified primes"),
+    (:num_ram, "Ramified prime count"),
+    (:conductor, "Conductor"),
+    (:index, "Index"),
+    (:monogenic, "Monogenic"),
+    (:cm, "CM field"),
+    (:is_minimal_sibling, "Minimal sibling"),
+    (:minimal_sibling, "Minimal sibling label"),
+    (:unit_signature_rank, "Unit signature rank"),
+    (:torsion_order, "Roots of unity"),
+    (:subfields, "Subfields"),
+    (:subfield_mults, "Subfield multiplicities"),
+    (:local_algs, "Local algebras"),
+    (:inessentialp, "Inessential primes"),
+    (:galois_disc_exponents, "Galois discr. exponents"),
+    (:maximal_cm_subfield, "Maximal CM subfield"),
+    (:embeddings_gen_real, "Generator real embeddings"),
+    (:embeddings_gen_imag, "Generator imag. embeddings"),
+    (:used_grh, "GRH used"),
+)
+
+format_detail_value(value::Bool) = value ? "yes" : "no"
+format_detail_value(value::AbstractVector) =
+    "[" * join((string(item) for item in skipmissing(value)), ", ") * "]"
+format_detail_value(value) = string(value)
+
+function format_boolean_detail(value)
+    value isa Bool && return format_detail_value(value)
+    value == 1 && return "yes"
+    value == 0 && return "no"
+    value == -1 && return "unknown"
+    return format_detail_value(value)
+end
+
+detail_line(label, value) = rpad("$label:", 28) * value
+
+function append_number_field_detail!(lines, row, property, label)
+    hasproperty(row, property) || return lines
+    value = getproperty(row, property)
+    (ismissing(value) || value === nothing) && return lines
+    formatted = property in NUMBER_FIELD_BOOLEAN_DETAILS || property == :monogenic ?
+                format_boolean_detail(value) : format_detail_value(value)
+    push!(lines, detail_line(label, formatted))
+    return lines
+end
+
+function number_field_row_detail_lines(row)
+    discriminant = row.disc_sign * row.disc_abs
+    signature = (row.degree - 2 * row.r2, row.r2)
+    lines = [
+        detail_line("LMFDB label", string(row.label)),
+        detail_line("Defining polynomial", polynomial_text(row.coeffs)),
+        detail_line("Degree", string(row.degree)),
+        detail_line("Signature", string(signature)),
+        detail_line("Discriminant", string(discriminant)),
+    ]
+    for (property, label) in NUMBER_FIELD_DETAIL_FIELDS
+        append_number_field_detail!(lines, row, property, label)
+    end
+    return lines
+end
+
+number_field_row_detail(row) = join(number_field_row_detail_lines(row), '\n')
+
 function compact_result(result, i)
+    if is_number_field_row(result)
+        return "$i. $(number_field_row_summary(result))"
+    end
     text = strip(sprint(show, result; context = :compact => true))
     text = replace(text, r"\s+" => " ")
     isempty(text) && (text = string(typeof(result)))
@@ -59,6 +180,32 @@ function make_result_list(results)
     items = [compact_result(result, i) for (i, result) in enumerate(results)]
     return T.SelectableList(items; focused = true, show_scrollbar = true,
                             block = T.Block(; title = "Fields"))
+end
+
+function result_detail_lines(result)
+    if is_number_field_row(result)
+        return number_field_row_detail_lines(result)
+    end
+    return split(sprint(show, MIME"text/plain"(), result; context = :limit => true), '\n')
+end
+
+function make_result_detail(results)
+    lines = isempty(results) ? ["No fields to display."] : result_detail_lines(first(results))
+    return T.ScrollPane(lines; following = false, word_wrap = true,
+                        block = T.Block(; title = "Selected field"))
+end
+
+function refresh_result_detail!(m::SearchUI)
+    m.result_detail === nothing && return nothing
+    if isempty(m.results)
+        T.set_content!(m.result_detail, ["No fields to display."])
+        return nothing
+    end
+    index = clamp(T.value(m.result_list), 1, length(m.results))
+    T.set_content!(m.result_detail, result_detail_lines(m.results[index]))
+    m.result_detail.offset = 0
+    m.result_detail.following = false
+    return nothing
 end
 
 function set_completion_focus!(m::SearchUI, index)
@@ -75,6 +222,7 @@ function start_search!(m::SearchUI, filters::NamedTuple)
     m.search_error = nothing
     m.results = nothing
     m.result_list = nothing
+    m.result_detail = nothing
     m.return_to_repl = false
     m.number_fields.quit = false
     connect = m.connect
@@ -110,6 +258,7 @@ function finish_search!(m::SearchUI, value)
     end
     m.results = value
     m.result_list = make_result_list(value)
+    m.result_detail = make_result_detail(value)
     m.search_state = :complete
     m.search_error = nothing
     set_completion_focus!(m, 1)
@@ -142,6 +291,7 @@ function update_completion!(m::SearchUI, e::T.KeyEvent)
         m.search_state = :editing
         m.results = nothing
         m.result_list = nothing
+        m.result_detail = nothing
         m.number_fields.submitted = nothing
         focus!(m.number_fields, :search)
     end
@@ -153,8 +303,12 @@ function update_results!(m::SearchUI, e::T.KeyEvent)
         m.page = :number_fields
     elseif e.key == :char && lowercase(e.char) == 'r'
         return_results!(m)
+    elseif e.key in (:pageup, :pagedown) && m.result_detail !== nothing
+        T.handle_key!(m.result_detail, e)
     elseif m.result_list !== nothing
+        selected = T.value(m.result_list)
         T.handle_key!(m.result_list, e)
+        T.value(m.result_list) != selected && refresh_result_detail!(m)
     end
     return nothing
 end
@@ -194,7 +348,10 @@ function T.update!(m::SearchUI, e::T.MouseEvent)
     if m.page == :home
         T.handle_mouse!(m.objects, e) # click selects; Enter opens the selected page
     elseif m.page == :results
-        m.result_list !== nothing && T.handle_mouse!(m.result_list, e)
+        selected = m.result_list === nothing ? 0 : T.value(m.result_list)
+        handled = m.result_list !== nothing && T.handle_mouse!(m.result_list, e)
+        m.result_list !== nothing && T.value(m.result_list) != selected && refresh_result_detail!(m)
+        !handled && m.result_detail !== nothing && T.handle_mouse!(m.result_detail, e)
     elseif m.search_state == :complete && e.button == T.mouse_left && e.action == T.mouse_press
         for (i, id) in enumerate((:browse, :return_repl))
             haskey(m.completion_hits, id) || continue
@@ -244,12 +401,6 @@ function render_search_status!(m::SearchUI, buf)
     return nothing
 end
 
-function result_detail(m::SearchUI)
-    (m.result_list === nothing || isempty(m.results)) && return "No fields to display."
-    index = clamp(T.value(m.result_list), 1, length(m.results))
-    return sprint(show, MIME"text/plain"(), m.results[index]; context = :limit => true)
-end
-
 function render_results!(m::SearchUI, area, buf)
     if area.width < 30 || area.height < 10
         T.render(T.Paragraph("Results — enlarge the terminal. Esc returns to the search.";
@@ -268,18 +419,16 @@ function render_results!(m::SearchUI, area, buf)
         detail_area = T.Rect(content.x + list_width + 1, content.y,
                              max(1, content.width - list_width - 1), content.height)
         m.result_list !== nothing && T.render(m.result_list, list_area, buf)
-        T.render(T.Paragraph(result_detail(m); wrap = T.word_wrap,
-                             block = T.Block(; title = "Selected field")), detail_area, buf)
+        m.result_detail !== nothing && T.render(m.result_detail, detail_area, buf)
     else
         list_height = max(3, content.height ÷ 2)
         list_area = T.Rect(content.x, content.y, content.width, list_height)
         detail_area = T.Rect(content.x, content.y + list_height,
                              content.width, max(1, content.height - list_height))
         m.result_list !== nothing && T.render(m.result_list, list_area, buf)
-        T.render(T.Paragraph(result_detail(m); wrap = T.word_wrap,
-                             block = T.Block(; title = "Selected field")), detail_area, buf)
+        m.result_detail !== nothing && T.render(m.result_detail, detail_area, buf)
     end
-    T.render(T.StatusBar(; left = [T.Span("Up/Down: browse  Esc: search", T.tstyle(:text_dim))],
+    T.render(T.StatusBar(; left = [T.Span("Up/Down: browse  PgUp/PgDn: details  Esc: search", T.tstyle(:text_dim))],
                          right = [T.Span("R: return all results to REPL ", T.tstyle(:text_dim))]),
              T.Rect(inner.x, footer_y, inner.width, 1), buf)
     return nothing
