@@ -8,6 +8,9 @@ function test_number_fields(conn::LMFDBLite.LMFDBConnection)
             Tachikoma.set_text!(m.number_fields.widgets[:limit], "1")
             ui.focus!(m.number_fields, :search)
             Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+            ui_receive_task!(m)
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:right))
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
         end)
         @test length(fields) == 1
         @test Hecke.get_attribute(only(fields), :lmfdb_label) == "2.2.5.1"
