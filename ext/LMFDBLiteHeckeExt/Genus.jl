@@ -1,4 +1,4 @@
-function _genera_from_records(conn::LMFDBLite.LMFDBConnection, records::Vector{<:NamedTuple})
+function _integer_genera_from_records(conn::LMFDBLite.LMFDBConnection, records::Vector{<:NamedTuple})
   result = ZZGenus[]
   isempty(records) && return result
   genus_labels = [record[:label] for record in records]
@@ -24,7 +24,7 @@ function _genera_from_records(conn::LMFDBLite.LMFDBConnection, records::Vector{<
 end
 
 function _genus_from_record(conn::LMFDBLite.LMFDBConnection, record::NamedTuple)
-  return only(_genera_from_records(conn, [record]))
+  return only(_integer_genera_from_records(conn, [record]))
 end
 
 """
@@ -40,7 +40,7 @@ function Hecke.genus(conn::LMFDBLite.LMFDBConnection, label::String)
   return _genus_from_record(conn, only(records))
 end
 
-function LMFDBLite.genera(conn::LMFDBLite.LMFDBConnection; limit = Inf, kw...)
+function Hecke.integer_genera(conn::LMFDBLite.LMFDBConnection; limit = Inf, kw...)
   records = LMFDBLite.search(conn, "lat_genera"; limit, kw...)
-  return _genera_from_records(conn, records)
+  return _integer_genera_from_records(conn, records)
 end
