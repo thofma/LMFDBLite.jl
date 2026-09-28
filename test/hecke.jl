@@ -1,6 +1,6 @@
 using Hecke
 
-@test LMFDBLite.UI.require_number_fields() === nothing
+@test LMFDBLite.UI.require_object_conversions() === nothing
 
 include("elliptic_curve_number_field_conversion.jl")
 
@@ -25,6 +25,17 @@ include("elliptic_curve_number_field_conversion.jl")
     @test Hecke.get_attribute.(fields, :lmfdb_label) == getproperty.(rows, :label)
     @test Hecke.defining_polynomial.(fields) ==
           map(row -> Hecke.Globals.Qx(BigInt.(row.coeffs)), rows)
+
+    converters = LMFDBLite.UI.default_result_converters()
+    curve_row = (; lmfdb_label = "11.a1", ainvs = BigInt[0, -1, 1, -10, -20])
+    curves = converters[:elliptic_curves](nothing, [curve_row])
+    @test length(curves) == 1
+    @test Hecke.get_attribute(only(curves), :lmfdb_label) == curve_row.lmfdb_label
+    lattice_row = (; label = "1.1.2.1.1", rank = 1, gram = BigInt[2], genus_label = missing)
+    lattices = converters[:integer_lattices](nothing, [lattice_row])
+    @test length(lattices) == 1
+    @test Hecke.get_attribute(only(lattices), :lmfdb_label) == lattice_row.label
+    @test isempty(converters[:elliptic_curves_number_fields](nothing, NamedTuple[]))
 end
 
 # ZZRingElem is also Oscar's integer type; these tests need no database.

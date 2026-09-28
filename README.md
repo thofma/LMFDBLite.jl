@@ -48,6 +48,10 @@ using LMFDBLite, Hecke
 fields = ui()
 ```
 
+The landing page provides search forms for every supported table. Searches can
+be browsed as database records, counted, or returned as Hecke objects. Integer
+lattices and genera are marked experimental to match their LMFDB table status.
+
 <p align="center">
   <img src="docs/assets/number-field-search.gif"
        alt="Julia REPL demo of searching and browsing number fields with the LMFDB terminal UI"

@@ -1,14 +1,72 @@
-# Only implemented search pages belong in this menu.
-const SEARCH_PAGES = [:number_fields => "Number fields"]
+const SEARCH_PAGES = [
+    :number_fields => "Number fields",
+    :elliptic_curves => "Elliptic curves over Q",
+    :elliptic_curves_number_fields => "Elliptic curves over number fields",
+    :integer_lattices => "Integer lattices (experimental)",
+    :genera => "Genera (experimental)",
+]
+
+const SEARCH_PAGE_TITLES = Dict(SEARCH_PAGES)
+
+const SEARCH_TABLES = Dict(
+    :number_fields => "nf_fields",
+    :elliptic_curves => "ec_curvedata",
+    :elliptic_curves_number_fields => "ec_nfcurves",
+    :integer_lattices => "lat_lattices_new",
+    :genera => "lat_genera",
+)
+
+const SEARCH_RESULT_NAMES = Dict(
+    :number_fields => ("field", "fields"),
+    :elliptic_curves => ("curve", "curves"),
+    :elliptic_curves_number_fields => ("curve", "curves"),
+    :integer_lattices => ("lattice", "lattices"),
+    :genera => ("genus", "genera"),
+)
+
+const SEARCH_TASK_IDS = Dict(
+    :number_fields => :number_field_search,
+    :elliptic_curves => :elliptic_curve_search,
+    :elliptic_curves_number_fields => :number_field_elliptic_curve_search,
+    :integer_lattices => :integer_lattice_search,
+    :genera => :genus_search,
+)
+
+const SEARCH_FORM_SPECS = Dict(
+    :number_fields => FIELD_SPECS,
+    :elliptic_curves => ELLIPTIC_CURVE_SPECS,
+    :elliptic_curves_number_fields => NUMBER_FIELD_ELLIPTIC_CURVE_SPECS,
+    :integer_lattices => INTEGER_LATTICE_SPECS,
+    :genera => GENUS_SPECS,
+)
 
 search_number_field_rows(conn; filters...) =
     LMFDBLite.search(conn, "nf_fields"; filters...)
+
+search_database_rows(page::Symbol, conn; filters...) =
+    LMFDBLite.search(conn, SEARCH_TABLES[page]; filters...)
+
+function search_executors(number_field_executor = search_number_field_rows)
+    return Dict{Symbol,Any}(
+        :number_fields => number_field_executor,
+        :elliptic_curves =>
+            (conn; filters...) -> search_database_rows(:elliptic_curves, conn; filters...),
+        :elliptic_curves_number_fields =>
+            (conn; filters...) -> search_database_rows(:elliptic_curves_number_fields, conn; filters...),
+        :integer_lattices =>
+            (conn; filters...) -> search_database_rows(:integer_lattices, conn; filters...),
+        :genera =>
+            (conn; filters...) -> search_database_rows(:genera, conn; filters...),
+    )
+end
 
 mutable struct SearchUI <: T.Model
     quit::Bool
     page::Symbol
     objects::T.SelectableList
-    number_fields::NumberFieldForm
+    number_fields::SearchForm
+    forms::Dict{Symbol,SearchForm}
+    database::Symbol
     submitted::Union{Nothing,NamedTuple}
     action::Symbol
     tasks::T.TaskQueue
@@ -24,15 +82,19 @@ mutable struct SearchUI <: T.Model
     result_detail::Union{Nothing,T.ScrollPane}
     return_to_repl::Bool
     connect::Any
-    execute::Any
+    execute::Dict{Symbol,Any}
 end
 
-function SearchUI(; connect = LMFDBLite.lmfdb, execute = search_number_field_rows)
+function SearchUI(; connect = LMFDBLite.lmfdb, execute = search_number_field_rows,
+                    executes = search_executors(execute))
+    forms = Dict(page => SearchForm(SEARCH_FORM_SPECS[page], title)
+                 for (page, title) in SEARCH_PAGES)
     return SearchUI(false, :home,
-        T.SelectableList(last.(SEARCH_PAGES); focused = true), NumberFieldForm(),
+        T.SelectableList(last.(SEARCH_PAGES); focused = true), forms[:number_fields],
+        forms, :number_fields,
         nothing, :search, T.TaskQueue(), :editing, nothing, nothing, 0, 1,
         T.Button("Browse"), T.Button("Return results to REPL"),
-        Dict{Symbol,T.Rect}(), nothing, nothing, false, connect, execute)
+        Dict{Symbol,T.Rect}(), nothing, nothing, false, connect, executes)
 end
 
 T.should_quit(m::SearchUI) = m.quit
@@ -41,16 +103,18 @@ T.set_wake!(m::SearchUI, notify::Function) = (m.tasks.on_ready = notify; nothing
 
 function open_selected_page!(m::SearchUI)
     page = first(SEARCH_PAGES[T.value(m.objects)])
-    if page == :number_fields
-        m.number_fields.quit = false
-        m.number_fields.submitted = nothing
-        m.search_state = :editing
-        m.search_error = nothing
-        focus!(m.number_fields, first(m.number_fields.ids))
-        m.page = page
-    end
+    form = m.forms[page]
+    form.quit = false
+    form.submitted = nothing
+    m.database = page
+    m.search_state = :editing
+    m.search_error = nothing
+    focus!(form, first(form.ids))
+    m.page = page
     return nothing
 end
+
+active_form(m::SearchUI) = m.forms[m.database]
 
 const NUMBER_FIELD_ROW_PROPERTIES =
     (:label, :coeffs, :disc_sign, :disc_abs, :degree, :r2)
@@ -166,43 +230,69 @@ end
 
 number_field_row_detail(row) = join(number_field_row_detail_lines(row), '\n')
 
-function compact_result(result, i)
+function row_identifier(result)
+    for property in (:label, :lmfdb_label, :Clabel, :genus_label)
+        hasproperty(result, property) || continue
+        value = getproperty(result, property)
+        (ismissing(value) || value === nothing) || return string(value)
+    end
+    return nothing
+end
+
+function generic_row_detail_lines(row::NamedTuple)
+    lines = String[]
+    for (property, value) in pairs(row)
+        (ismissing(value) || value === nothing) && continue
+        label = uppercasefirst(replace(String(property), '_' => ' '))
+        push!(lines, detail_line(label, format_detail_value(value)))
+    end
+    return isempty(lines) ? ["No details available."] : lines
+end
+
+function compact_result(result, i, database = :number_fields)
     if is_number_field_row(result)
         return "$i. $(number_field_row_summary(result))"
     end
+    identifier = result isa NamedTuple ? row_identifier(result) : nothing
+    identifier === nothing || return "$i. $identifier"
     text = strip(sprint(show, result; context = :compact => true))
     text = replace(text, r"\s+" => " ")
     isempty(text) && (text = string(typeof(result)))
     return "$i. $text"
 end
 
-function make_result_list(results)
-    items = [compact_result(result, i) for (i, result) in enumerate(results)]
+function make_result_list(results, database = :number_fields)
+    items = [compact_result(result, i, database) for (i, result) in enumerate(results)]
+    _, plural = SEARCH_RESULT_NAMES[database]
     return T.SelectableList(items; focused = true, show_scrollbar = true,
-                            block = T.Block(; title = "Fields"))
+                            block = T.Block(; title = uppercasefirst(plural)))
 end
 
-function result_detail_lines(result)
+function result_detail_lines(result, database = :number_fields)
     if is_number_field_row(result)
         return number_field_row_detail_lines(result)
+    elseif result isa NamedTuple
+        return generic_row_detail_lines(result)
     end
     return split(sprint(show, MIME"text/plain"(), result; context = :limit => true), '\n')
 end
 
-function make_result_detail(results)
-    lines = isempty(results) ? ["No fields to display."] : result_detail_lines(first(results))
+function make_result_detail(results, database = :number_fields)
+    singular, plural = SEARCH_RESULT_NAMES[database]
+    lines = isempty(results) ? ["No $plural to display."] : result_detail_lines(first(results), database)
     return T.ScrollPane(lines; following = false, word_wrap = true,
-                        block = T.Block(; title = "Selected field"))
+                        block = T.Block(; title = "Selected $singular"))
 end
 
 function refresh_result_detail!(m::SearchUI)
     m.result_detail === nothing && return nothing
     if isempty(m.results)
-        T.set_content!(m.result_detail, ["No fields to display."])
+        _, plural = SEARCH_RESULT_NAMES[m.database]
+        T.set_content!(m.result_detail, ["No $plural to display."])
         return nothing
     end
     index = clamp(T.value(m.result_list), 1, length(m.results))
-    T.set_content!(m.result_detail, result_detail_lines(m.results[index]))
+    T.set_content!(m.result_detail, result_detail_lines(m.results[index], m.database))
     m.result_detail.offset = 0
     m.result_detail.following = false
     return nothing
@@ -224,17 +314,17 @@ function start_search!(m::SearchUI, filters::NamedTuple)
     m.result_list = nothing
     m.result_detail = nothing
     m.return_to_repl = false
-    m.number_fields.quit = false
+    active_form(m).quit = false
     connect = m.connect
-    execute = m.execute
-    T.spawn_task!(m.tasks, :number_field_search) do
+    execute = m.execute[m.database]
+    T.spawn_task!(m.tasks, SEARCH_TASK_IDS[m.database]) do
         execute(connect(); filters...)
     end
     return nothing
 end
 
 function finish_page!(m::SearchUI)
-    form = m.number_fields
+    form = active_form(m)
     form.quit || return nothing
     if form.submitted === nothing
         form.quit = false
@@ -253,12 +343,12 @@ function finish_search!(m::SearchUI, value)
     if value isa Exception
         m.search_state = :failed
         m.search_error = value
-        m.number_fields.submitted = nothing
+        active_form(m).submitted = nothing
         return nothing
     end
     m.results = value
-    m.result_list = make_result_list(value)
-    m.result_detail = make_result_detail(value)
+    m.result_list = make_result_list(value, m.database)
+    m.result_detail = make_result_detail(value, m.database)
     m.search_state = :complete
     m.search_error = nothing
     set_completion_focus!(m, 1)
@@ -292,15 +382,15 @@ function update_completion!(m::SearchUI, e::T.KeyEvent)
         m.results = nothing
         m.result_list = nothing
         m.result_detail = nothing
-        m.number_fields.submitted = nothing
-        focus!(m.number_fields, :search)
+        active_form(m).submitted = nothing
+        focus!(active_form(m), :search)
     end
     return nothing
 end
 
 function update_results!(m::SearchUI, e::T.KeyEvent)
     if e.key == :escape
-        m.page = :number_fields
+        m.page = m.database
     elseif e.key == :char && lowercase(e.char) == 'r'
         return_results!(m)
     elseif e.key in (:pageup, :pagedown) && m.result_detail !== nothing
@@ -314,7 +404,7 @@ function update_results!(m::SearchUI, e::T.KeyEvent)
 end
 
 function T.update!(m::SearchUI, e::T.TaskEvent)
-    e.id == :number_field_search && m.search_state == :searching && finish_search!(m, e.value)
+    e.id == SEARCH_TASK_IDS[m.database] && m.search_state == :searching && finish_search!(m, e.value)
     return nothing
 end
 
@@ -337,7 +427,7 @@ function T.update!(m::SearchUI, e::T.KeyEvent)
     elseif m.search_state == :complete
         update_completion!(m, e)
     else
-        T.update!(m.number_fields, e)
+        T.update!(active_form(m), e)
         finish_page!(m)
     end
     return nothing
@@ -361,7 +451,7 @@ function T.update!(m::SearchUI, e::T.MouseEvent)
             break
         end
     elseif m.search_state != :searching
-        T.update!(m.number_fields, e)
+        T.update!(active_form(m), e)
         finish_page!(m)
     end
     return nothing
@@ -374,7 +464,7 @@ end
 
 function render_search_status!(m::SearchUI, buf)
     empty!(m.completion_hits)
-    area = m.number_fields.status_area
+    area = active_form(m).status_area
     area.width > 0 || return nothing
     if m.search_state == :searching
         spinner = T.SPINNER_BRAILLE[mod1(m.tick ÷ 3, length(T.SPINNER_BRAILLE))]
@@ -383,7 +473,8 @@ function render_search_status!(m::SearchUI, buf)
                       T.tstyle(:accent, bold = true); max_x = T.right(area))
     elseif m.search_state == :complete
         n = length(m.results)
-        noun = n == 1 ? "field" : "fields"
+        singular, plural = SEARCH_RESULT_NAMES[m.database]
+        noun = n == 1 ? singular : plural
         T.set_string!(buf, area.x, area.y, "Search complete. $n $noun retrieved",
                       T.tstyle(:success, bold = true); max_x = T.right(area))
         browse_width = min(12, area.width)
@@ -408,7 +499,7 @@ function render_results!(m::SearchUI, area, buf)
         return nothing
     end
     result_noun = length(m.results) == 1 ? "result" : "results"
-    inner = T.render(T.Block(; title = "Number fields — $(length(m.results)) $result_noun",
+    inner = T.render(T.Block(; title = "$(SEARCH_PAGE_TITLES[m.database]) — $(length(m.results)) $result_noun",
                              border_style = T.tstyle(:border),
                              title_style = T.tstyle(:title)), area, buf)
     footer_y = T.bottom(inner)
@@ -438,8 +529,8 @@ function render_ui!(m::SearchUI, area, buf)
     m.objects.last_area = T.Rect()
     if m.page == :results
         return render_results!(m, area, buf)
-    elseif m.page == :number_fields
-        render_form!(m.number_fields, area, buf)
+    elseif haskey(m.forms, m.page)
+        render_form!(active_form(m), area, buf)
         render_search_status!(m, buf)
         return nothing
     end
