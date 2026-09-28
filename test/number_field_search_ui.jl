@@ -163,7 +163,7 @@ end
 end
 
 @testset "Form interaction and layout" begin
-    m = NFUI.NumberFieldForm()
+    m = NFUI.SearchForm()
     @test NFUI.focused_id(m) == :degree
     tb = ui_render(m)
     @test Tachikoma.find_text(tb, "Number fields") !== nothing
@@ -241,10 +241,101 @@ end
                                           Tachikoma.mouse_press, false, false, false))
     @test m.quit && m.submitted == (; degree = big(2), signature = (big(0),big(1)), limit = 1)
     for key in (:escape, :ctrl_c)
-        cancelled = NFUI.NumberFieldForm()
+        cancelled = NFUI.SearchForm()
         Tachikoma.update!(cancelled, Tachikoma.KeyEvent(key))
         @test cancelled.quit && cancelled.submitted === nothing
     end
+end
+
+@testset "Remaining database search forms" begin
+    form_definitions = [
+        (:elliptic_curves, LMFDBLite._elliptic_curve_parameter_definitions(), Set((:ainvs, :jinv))),
+        (:elliptic_curves_number_fields, LMFDBLite._number_field_elliptic_curve_parameter_definitions(), Set((:ainvs, :jinv))),
+        (:integer_lattices, LMFDBLite._lattice_parameter_definitions(), Set((:disc, :discriminant_group_invs))),
+        (:genera, LMFDBLite._genus_parameter_definitions(), Set((:disc, :det, :rep, :discriminant_group_invs))),
+    ]
+    for (page, definitions, aliases) in form_definitions
+        expected = setdiff(Set(keys(definitions)), aliases)
+        actual = Set(spec.id for spec in NFUI.SEARCH_FORM_SPECS[page] if spec.id != :limit)
+        @test actual == expected
+    end
+
+    ec = NFUI.parse_inputs(NFUI.ELLIPTIC_CURVE_SPECS, Dict(
+        :conductor => "11..37", :torsion_structure => "[2,4]",
+        :j_invariant => "-1/2", :semistable => "Yes", :limit => "3"))
+    @test ec.conductor(11) && ec.conductor(37) && !ec.conductor(38)
+    @test ec.torsion_structure == BigInt[2, 4]
+    @test ec.j_invariant == -1//2
+    @test ec.semistable === true && ec.limit == 3
+
+    ecnf = NFUI.parse_inputs(NFUI.NUMBER_FIELD_ELLIPTIC_CURVE_SPECS, Dict(
+        :degree => "2", :signature => "(0,1)", :field_label => "2.2.5.1",
+        :a_invariants => "1,0;0,1;1;0;0", :is_q_curve => "No"))
+    @test ecnf.degree == 2 && ecnf.signature == (0, 1)
+    @test ecnf.a_invariants == "1,0;0,1;1;0;0" && ecnf.is_q_curve === false
+    @test_throws NFUI.InputError NFUI.parse_inputs(
+        NFUI.NUMBER_FIELD_ELLIPTIC_CURVE_SPECS,
+        Dict(:degree => "3", :signature => "(0,1)"))
+
+    lattice = NFUI.parse_inputs(NFUI.INTEGER_LATTICE_SPECS, Dict(
+        :rank => "3", :signature => "(2,1)", :gram_matrix => "[2,0,0,0,2,0,0,0,2]",
+        :is_even => "Yes"))
+    @test lattice.rank == 3 && lattice.signature == (2, 1)
+    @test length(lattice.gram_matrix) == 9 && lattice.is_even === true
+    @test_throws NFUI.InputError NFUI.parse_inputs(
+        NFUI.INTEGER_LATTICE_SPECS, Dict(:rank => "2", :signature => "(2,1)"))
+
+    genus = NFUI.parse_inputs(NFUI.GENUS_SPECS,
+        Dict(:mass => "1/2", :discriminant_form => "[]", :limit => ""))
+    @test genus == (; discriminant_form = BigInt[], mass = 1//2)
+
+    calls = Pair{Symbol,NamedTuple}[]
+    executes = Dict{Symbol,Any}()
+    for (index, (page, _)) in enumerate(NFUI.SEARCH_PAGES)
+        executes[page] = let selected_page = page, result_label = "result-$index"
+            (conn; kw...) -> begin
+                @test conn == :connection
+                push!(calls, selected_page => (; kw...))
+                [(; label = result_label, rank = 0)]
+            end
+        end
+    end
+    m = NFUI.SearchUI(; connect = () -> :connection, executes)
+    for (index, (page, title)) in enumerate(NFUI.SEARCH_PAGES)
+        Tachikoma.set_value!(m.objects, index)
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+        @test m.page == page && m.database == page
+        form = NFUI.active_form(m)
+        @test form.title == title
+        tb = ui_render(form, 120, 40)
+        @test Tachikoma.find_text(tb, "$title — Search") !== nothing
+        for id in form.ids
+            NFUI.focus!(form, id)
+            ui_render(form, 80, 24)
+            @test haskey(form.hits, id)
+        end
+        NFUI.focus!(form, :reset)
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+        @test !m.quit && !form.quit
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:ctrl, 's'))
+        event = ui_receive_task!(m)
+        @test event.id == NFUI.SEARCH_TASK_IDS[page]
+        @test m.search_state == :complete && length(m.results) == 1
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+        @test m.page == :results
+        tb = Tachikoma.TestBackend(100, 24)
+        NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 100, 24), tb.buf)
+        @test Tachikoma.find_text(tb, "$title — 1 result") !== nothing
+        @test Tachikoma.find_text(tb, "result-$index") !== nothing
+        @test Tachikoma.find_text(tb, "Rank:") !== nothing
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:escape))
+        @test m.page == page && m.search_state == :complete
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:escape))
+        @test m.search_state == :editing
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:escape))
+        @test m.page == :home && !m.quit
+    end
+    @test first.(calls) == first.(NFUI.SEARCH_PAGES)
 end
 
 @testset "Search browses rows and converts them after selection" begin
@@ -473,6 +564,51 @@ end
     @test LMFDBLite._lmfdb_cache[] === nothing
 end
 
+@testset "Database-specific count and conversion dispatch" begin
+    never = (args...; kw...) -> error("must not run")
+    pages = first.(NFUI.SEARCH_PAGES)
+    default_counts = NFUI.default_count_executors()
+    @test default_counts[:number_fields] === LMFDBLite.count_number_fields
+    @test default_counts[:elliptic_curves] === LMFDBLite.count_elliptic_curves
+    @test default_counts[:elliptic_curves_number_fields] === LMFDBLite.count_elliptic_curves_over_number_fields
+    @test default_counts[:integer_lattices] === LMFDBLite.count_integer_lattices
+    @test default_counts[:genera] === LMFDBLite.count_genera
+    for (index, page) in enumerate(pages)
+        counts = Dict{Symbol,Any}(candidate => let selected = candidate
+            (conn; kw...) -> begin
+                @test conn == :connection
+                @test isempty(kw)
+                return selected
+            end
+        end for candidate in pages)
+        count_runner = function(m)
+            Tachikoma.set_value!(m.objects, index)
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+            NFUI.focus!(NFUI.active_form(m), :count)
+            Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+            @test m.quit && m.database == page
+        end
+        @test NFUI.run_ui(; runner = count_runner, connect = () -> :connection,
+            execute = never, execute_counts = counts) == page
+
+        rows = [(; label = "sample")]
+        converters = Dict{Symbol,Any}(candidate => let selected = candidate
+            (conn, actual) -> begin
+                @test conn == (selected == :number_fields ? nothing : :connection)
+                @test actual === rows
+                return selected
+            end
+        end for candidate in pages)
+        conversion_runner = function(m)
+            m.database = page
+            m.results = rows
+            m.return_to_repl = true
+        end
+        @test NFUI.run_ui(; runner = conversion_runner, connect = () -> :connection,
+            execute = never, result_converters = converters) == page
+    end
+end
+
 @testset "LMFDB landing page and navigation" begin
     m = NFUI.SearchUI()
     for (width, height) in ((120,40), (80,24), (30,10))
@@ -480,14 +616,37 @@ end
         NFUI.render_ui!(m, Tachikoma.Rect(1, 1, width, height), tb.buf)
         @test Tachikoma.find_text(tb, "LMFDB") !== nothing
         @test Tachikoma.find_text(tb, "Number fields") !== nothing
+        if height >= 14
+            @test Tachikoma.find_text(tb, "Elliptic curves over Q") !== nothing
+            @test Tachikoma.find_text(tb, "Elliptic curves over number fields") !== nothing
+            @test Tachikoma.find_text(tb, "Integer lattices (experimental)") !== nothing
+            @test Tachikoma.find_text(tb, "Genera (experimental)") !== nothing
+        end
         @test m.page == :home && !m.quit
     end
-    # The available page is selectable with arrows or a click; Enter opens it.
-    for key in (:up, :down, :home, :end_key)
-        Tachikoma.update!(m, Tachikoma.KeyEvent(key))
-        @test Tachikoma.value(m.objects) == 1
-        @test m.page == :home
+    # Every supported database opens its search form and Escape returns home.
+    for (index, (page, title)) in enumerate(NFUI.SEARCH_PAGES)
+        Tachikoma.set_value!(m.objects, index)
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:enter))
+        @test m.page == page
+        tb = Tachikoma.TestBackend(80, 24)
+        NFUI.render_ui!(m, Tachikoma.Rect(1, 1, 80, 24), tb.buf)
+        @test Tachikoma.find_text(tb, "$title — Search") !== nothing
+        @test Tachikoma.find_text(tb, "Back") !== nothing
+        Tachikoma.update!(m, Tachikoma.KeyEvent(:escape))
+        @test m.page == :home && !m.quit
     end
+    Tachikoma.set_value!(m.objects, 1)
+    Tachikoma.update!(m, Tachikoma.KeyEvent(:up))
+    @test Tachikoma.value(m.objects) == length(NFUI.SEARCH_PAGES)
+    Tachikoma.update!(m, Tachikoma.KeyEvent(:home))
+    @test Tachikoma.value(m.objects) == 1
+    @test m.page == :home
+    Tachikoma.update!(m, Tachikoma.KeyEvent(:end_key))
+    @test Tachikoma.value(m.objects) == length(NFUI.SEARCH_PAGES)
+    Tachikoma.update!(m, Tachikoma.KeyEvent(:down))
+    @test Tachikoma.value(m.objects) == 1
+    Tachikoma.set_value!(m.objects, 1)
     rect = m.objects.last_area
     Tachikoma.update!(m, Tachikoma.MouseEvent(rect.x, rect.y, Tachikoma.mouse_left,
                                           Tachikoma.mouse_press, false, false, false))

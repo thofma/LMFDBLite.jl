@@ -126,11 +126,22 @@ function galois_input(s::AbstractString)
     return String(s)
 end
 
+function rational_operand(s::AbstractString)
+    parts = strip.(split(s, '/'; keepempty = true))
+    length(parts) in (1, 2) && all(part -> !isempty(part), parts) ||
+        throw(ArgumentError("Use an integer or one fraction, e.g. 1/2."))
+    numerator = integer_operand(first(parts))
+    denominator = length(parts) == 1 ? big(1) : integer_operand(last(parts))
+    iszero(denominator) && throw(ArgumentError("The denominator must be nonzero."))
+    return numerator // denominator
+end
+
 function parse_field(spec::FieldSpec, input::AbstractString)
     s = strip(input)
     isempty(s) && return nothing
     kind = spec.kind
-    kind in (:integer, :positive_integer, :nonnegative_integer, :positive_real, :nonnegative_real) &&
+    kind in (:integer, :positive_integer, :nonnegative_integer, :real,
+             :positive_real, :nonnegative_real) &&
         return numeric_condition(s, kind)
     if kind == :signature
         startswith(s, '(') && endswith(s, ')') && (s = "[" * chop(s; head = 1, tail = 1) * "]")
@@ -143,6 +154,12 @@ function parse_field(spec::FieldSpec, input::AbstractString)
         all(>=(2), values) && all(i -> iszero(rem(values[i+1], values[i])), 1:length(values)-1) ||
             throw(ArgumentError("Factors must be at least 2 and each divide the next; e.g. [2,4]."))
         return values
+    elseif kind == :integer_list
+        return integer_list(s)
+    elseif kind == :rational
+        return rational_operand(s)
+    elseif kind == :text
+        return String(s)
     elseif kind == :ramified
         values = integer_list(s; brackets = false)
         all(>=(2), values) || throw(ArgumentError("Enter primes at least 2, e.g. 2,3."))
@@ -171,9 +188,9 @@ matches(c::LMFDBLite.Or, value) = matches(c.a, value) || matches(c.b, value)
 matches(c::Base.Fix2, value) = c(value)
 matches(c::Number, value) = c == value
 
-function parse_inputs(inputs::AbstractDict)
+function parse_inputs(specs::AbstractVector{FieldSpec}, inputs::AbstractDict)
     keywords = Pair{Symbol,Any}[]
-    for spec in FIELD_SPECS
+    for spec in specs
         try
             value = parse_field(spec, get(inputs, spec.id, default_input(spec)))
             value === nothing && continue
@@ -198,6 +215,12 @@ function parse_inputs(inputs::AbstractDict)
         r1, r2 = result.signature
         matches(result.degree, r1 + 2r2) ||
             throw(InputError(:signature, "Signature has degree $(r1 + 2r2), outside the Degree condition."))
+    elseif haskey(result, :signature) && haskey(result, :rank)
+        nplus, nminus = result.signature
+        matches(result.rank, nplus + nminus) ||
+            throw(InputError(:signature, "Signature has rank $(nplus + nminus), outside the Rank condition."))
     end
     return result
 end
+
+parse_inputs(inputs::AbstractDict) = parse_inputs(FIELD_SPECS, inputs)

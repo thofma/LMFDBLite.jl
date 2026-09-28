@@ -1,4 +1,4 @@
-mutable struct NumberFieldForm <: T.Model
+mutable struct SearchForm <: T.Model
     quit::Bool
     submitted::Union{Nothing,NamedTuple}
     action::Symbol
@@ -13,12 +13,16 @@ mutable struct NumberFieldForm <: T.Model
     hits::Dict{Symbol,T.Rect}
     body::T.Rect
     status_area::T.Rect
+    specs::Vector{FieldSpec}
+    title::String
 end
 
-function NumberFieldForm()
+SearchForm() = SearchForm(FIELD_SPECS, "Number fields")
+
+function SearchForm(specs::Vector{FieldSpec}, title::AbstractString)
     widgets = Dict{Symbol,Any}()
     ids = Symbol[]
-    for spec in FIELD_SPECS
+    for spec in specs
         widgets[spec.id] = if spec.kind == :boolean
             T.DropDown(["Any", "Yes", "No"])
         elseif spec.kind == :field_is
@@ -36,14 +40,14 @@ function NumberFieldForm()
         widgets[id] = T.Button(label)
         push!(ids, id)
     end
-    model = NumberFieldForm(false, nothing, :search, widgets, ids,
+    model = SearchForm(false, nothing, :search, widgets, ids,
         T.FocusRing(Any[widgets[id] for id in ids]), Dict{Symbol,String}(),
-        0, 1, 1, true, Dict{Symbol,T.Rect}(), T.Rect(), T.Rect())
+        0, 1, 1, true, Dict{Symbol,T.Rect}(), T.Rect(), T.Rect(), specs, String(title))
     sync_focus!(model)
     return model
 end
 
-T.should_quit(m::NumberFieldForm) = m.quit
+T.should_quit(m::SearchForm) = m.quit
 focused_id(m) = m.ids[m.focus.active]
 field_id(id) = id == :ramified_relation ? :ramified : id
 
@@ -75,7 +79,7 @@ function submit!(m, action = :search)
     try
         inputs = form_inputs(m)
         action == :count && (inputs[:limit] = "") # Count all matches, regardless of the result limit.
-        m.submitted = parse_inputs(inputs)
+        m.submitted = parse_inputs(m.specs, inputs)
         m.action = action
         m.quit = true
     catch e
@@ -87,7 +91,7 @@ function submit!(m, action = :search)
 end
 
 function reset_form!(m)
-    for spec in FIELD_SPECS
+    for spec in m.specs
         widget = m.widgets[spec.id]
         if widget isa T.TextInput
             T.set_text!(widget, default_input(spec))
@@ -96,8 +100,10 @@ function reset_form!(m)
             widget.open = false
         end
     end
-    T.set_value!(m.widgets[:ramified_relation], 1)
-    m.widgets[:ramified_relation].open = false
+    if haskey(m.widgets, :ramified_relation)
+        T.set_value!(m.widgets[:ramified_relation], 1)
+        m.widgets[:ramified_relation].open = false
+    end
     empty!(m.errors)
     m.submitted = nothing
     m.action = :search
@@ -117,12 +123,12 @@ function activate!(m, id)
 end
 
 function scroll!(m, delta)
-    total = cld(length(FIELD_SPECS), m.columns)
+    total = cld(length(m.specs), m.columns)
     m.scroll = clamp(m.scroll + delta, 0, max(0, total - m.visible_rows))
     m.reveal_focus = false
 end
 
-function T.update!(m::NumberFieldForm, e::T.KeyEvent)
+function T.update!(m::SearchForm, e::T.KeyEvent)
     m.quit && return
     e.action == T.key_release && return
     if e.key == :ctrl_c
@@ -161,7 +167,7 @@ function T.update!(m::NumberFieldForm, e::T.KeyEvent)
     return nothing
 end
 
-function T.update!(m::NumberFieldForm, e::T.MouseEvent)
+function T.update!(m::SearchForm, e::T.MouseEvent)
     m.quit && return
     widget = T.current(m.focus)
     if widget isa T.DropDown && widget.open
@@ -205,7 +211,7 @@ function draw_widget!(m, id, rect, buf)
     m.hits[id] = widget.last_area
 end
 
-function T.view(m::NumberFieldForm, frame::T.Frame)
+function T.view(m::SearchForm, frame::T.Frame)
     render_form!(m, frame.area, frame.buffer)
 end
 
@@ -221,7 +227,7 @@ function render_form!(m, area, buf)
                             wrap = T.word_wrap), area, buf)
         return
     end
-    inner = T.render(T.Block(; title = "Number fields — Search",
+    inner = T.render(T.Block(; title = "$(m.title) — Search",
                              border_style = T.tstyle(:border),
                              title_style = T.tstyle(:title)), area, buf)
     T.set_string!(buf, inner.x + 1, inner.y,
@@ -238,8 +244,8 @@ function render_form!(m, area, buf)
         m.reveal_focus = true
     end
     m.columns, m.visible_rows, m.body = columns, visible_rows, body
-    total_rows = cld(length(FIELD_SPECS), columns)
-    index = findfirst(s -> s.id == field_id(focused_id(m)), FIELD_SPECS)
+    total_rows = cld(length(m.specs), columns)
+    index = findfirst(s -> s.id == field_id(focused_id(m)), m.specs)
     if m.reveal_focus && index !== nothing
         row = (index - 1) ÷ columns
         m.scroll = clamp(m.scroll, row - visible_rows + 1, row)
@@ -247,7 +253,7 @@ function render_form!(m, area, buf)
     m.scroll = clamp(m.scroll, 0, max(0, total_rows - visible_rows))
     m.reveal_focus = false
     cell_width = (body.width - 3(columns - 1)) ÷ columns
-    for (i, spec) in enumerate(FIELD_SPECS)
+    for (i, spec) in enumerate(m.specs)
         row, col = divrem(i - 1, columns)
         m.scroll <= row < m.scroll + visible_rows || continue
         x = body.x + col * (cell_width + 3)
@@ -269,11 +275,11 @@ function render_form!(m, area, buf)
     end
 
     help = if index === nothing
-        focused_id(m) == :search ? "Search runs here; then browse the fields or return them to Julia." :
+        focused_id(m) == :search ? "Search runs here; then browse the results or return them to Julia." :
         focused_id(m) == :count ? "Count closes the form and returns the total matches, ignoring the result limit." :
         focused_id(m) == :reset ? "Reset all filters and restore the result limit to 50." : "Back to the object list, keeping these filters."
     else
-        spec = FIELD_SPECS[index]
+        spec = m.specs[index]
         get(m.errors, spec.id, "") * (haskey(m.errors, spec.id) ? " " : "") * spec.help
     end
     help_style = haskey(m.errors, field_id(focused_id(m))) ? T.tstyle(:error) :
