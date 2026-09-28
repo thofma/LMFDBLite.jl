@@ -12,7 +12,7 @@ function test_live_ordering(conn)
             ("lat_lattices_new", :discriminant, (; rank = 1),
              r -> BigInt(r.disc), LMFDBLite.integer_lattices),
             ("lat_genera", :determinant, (; rank = 1),
-             r -> BigInt(r.det), LMFDBLite.genera),
+             r -> BigInt(r.det), Hecke.integer_genera),
         )
         for (table, parameter, selection, value, convert_records) in cases
             @testset "$table" begin

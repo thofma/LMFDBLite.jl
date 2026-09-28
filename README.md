@@ -188,7 +188,7 @@ julia> LMFDBLite.integer_lattices(conn; rank = 3, signature = (3, 0), disc = 1)
 1-element Vector{ZZLat}:
  Integer lattice of rank 3 and degree 3
 
-julia> LMFDBLite.genera(conn; rank = 1, limit = 3)
+julia> integer_genera(conn; rank = 1, limit = 3)
 3-element Vector{ZZGenus}:
  Genus symbol: II_(1, 0) 8^1_1 121^-1
  Genus symbol: I_(1, 0) 625^1

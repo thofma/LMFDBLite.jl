@@ -105,7 +105,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         @test_throws ArgumentError LMFDBLite.search(conn, "lat_genera"; mass = <(1//2), limit = 1)
         @test_throws ArgumentError LMFDBLite.search(conn, "lat_genera"; genus_label = sample.label, limit = 1)
 
-        genera = LMFDBLite.genera(conn; label = in(pool), signature = (1, 0))
+        genera = Hecke.integer_genera(conn; label = in(pool), signature = (1, 0))
         @test genera isa Vector{Hecke.ZZGenus}
         @test Set(Hecke.get_attribute(G, :lmfdb_label) for G in genera) == Set(pool)
         records = Dict(r.label => r for r in reference)
@@ -113,9 +113,9 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
             record = records[Hecke.get_attribute(G, :lmfdb_label)]
             @test G == Hecke.genus(Hecke.matrix(Hecke.ZZ, 1, 1, Int.(record.rep)))
         end
-        @test length(LMFDBLite.genera(conn; label = in(pool), limit = 1)) == 1
-        @test isempty(LMFDBLite.genera(conn; rank = 1, limit = 0))
-        @test isempty(LMFDBLite.genera(conn; label = in(String[])))
+        @test length(Hecke.integer_genera(conn; label = in(pool), limit = 1)) == 1
+        @test isempty(Hecke.integer_genera(conn; rank = 1, limit = 0))
+        @test isempty(Hecke.integer_genera(conn; label = in(String[])))
         @test_throws ErrorException Hecke.genus(conn, "no-such-genus")
 
         # This small genus has its complete representative set in the lattice table.
@@ -132,7 +132,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         ext = Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt)
         for altered in (merge(record, (; label = "no-stored-representatives")),
                         merge(record, (; class_number = record.class_number + 1)))
-            result = only(ext._genera_from_records(conn, [altered]))
+            result = only(ext._integer_genera_from_records(conn, [altered]))
             @test result == G
             @test !Hecke.has_attribute(result, :representatives)
         end
