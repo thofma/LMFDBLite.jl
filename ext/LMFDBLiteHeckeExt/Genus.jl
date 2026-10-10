@@ -1,3 +1,21 @@
+function _genus_from_record(record::NamedTuple, genus_representatives::Vector{ZZLat})
+  rank = Int(record[:rank])
+  representative = integer_lattice(; gram = matrix(ZZ, rank, rank, record[:rep]))
+  G = Hecke.genus(representative)
+  set_attribute!(G, :lmfdb_label => record[:label])
+  if !ismissing(record[:class_number]) &&
+     length(genus_representatives) == record[:class_number] &&
+     !isempty(genus_representatives)
+    # Hecke 0.40.5 moved the representative cache from an attribute to a field.
+    if hasfield(typeof(G), :_representatives)
+      G._representatives = genus_representatives
+    else
+      set_attribute!(G, :representatives => genus_representatives)
+    end
+  end
+  return G
+end
+
 function _integer_genera_from_records(conn::LMFDBLite.LMFDBConnection, records::Vector{<:NamedTuple})
   result = ZZGenus[]
   isempty(records) && return result
@@ -9,16 +27,7 @@ function _integer_genera_from_records(conn::LMFDBLite.LMFDBConnection, records::
       representative -> get_attribute(representative, :lmfdb_genus_label) == label,
       representatives,
     )
-    rank = Int(record[:rank])
-    representative = integer_lattice(; gram = matrix(ZZ, rank, rank, record[:rep]))
-    G = Hecke.genus(representative)
-    set_attribute!(G, :lmfdb_label => label)
-    if !ismissing(record[:class_number]) &&
-       length(genus_representatives) == record[:class_number] &&
-       !isempty(genus_representatives)
-      set_attribute!(G, :representatives => genus_representatives)
-    end
-    push!(result, G)
+    push!(result, _genus_from_record(record, genus_representatives))
   end
   return result
 end
