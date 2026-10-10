@@ -3,6 +3,7 @@ using Hecke
 @test LMFDBLite.UI.require_object_conversions() === nothing
 
 include("elliptic_curve_number_field_conversion.jl")
+include("genus_conversion.jl")
 
 @testset "Hecke extension" begin
     @test Base.get_extension(LMFDBLite, :LMFDBLiteHeckeExt) !== nothing

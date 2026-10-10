@@ -1,6 +1,6 @@
 name = "LMFDBLite"
 uuid = "d66269b8-7907-4a75-8041-d35544a92097"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Tommy Hofmann <thofma@gmail.com>"]
 
 [deps]
@@ -20,7 +20,7 @@ LMFDBLiteHeckeExt = "Hecke"
 [compat]
 DBInterface = "2.6.1"
 FunSQL = "0.15.0"
-Hecke = "0.39.12, 0.40.0"
+Hecke = "0.39.12, 0.40.0, 0.41.0"
 LibPQ = "1.18.0"
 Tables = "1.12.1"
 Tachikoma = "2.6.1"

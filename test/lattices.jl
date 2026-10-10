@@ -125,7 +125,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
         G = Hecke.genus(conn, label)
         @test Hecke.get_attribute(G, :lmfdb_label) == label
         @test length(lattice_records) == record.class_number == 1
-        @test Hecke.has_attribute(G, :representatives)
+        @test has_cached_genus_representatives(G)
         @test Set(Hecke.get_attribute(L, :lmfdb_label) for L in Hecke.representatives(G)) == labels(lattice_records)
 
         # A genus remains constructible if representatives are absent or incomplete.
@@ -134,7 +134,7 @@ function test_lattices_and_genera(conn::LMFDBLite.LMFDBConnection)
                         merge(record, (; class_number = record.class_number + 1)))
             result = only(ext._integer_genera_from_records(conn, [altered]))
             @test result == G
-            @test !Hecke.has_attribute(result, :representatives)
+            @test !has_cached_genus_representatives(result)
         end
     end
 end
